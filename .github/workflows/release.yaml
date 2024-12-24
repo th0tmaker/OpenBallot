@@ -1,0 +1,38 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - '.vscode/**'
+      - '.idea/**'
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  OpenBallot-contracts-validate:
+    name: Run OpenBallot-contracts release
+    secrets: inherit
+    uses: ./.github/workflows/OpenBallot-contracts-ci.yaml
+
+  OpenBallot-contracts-release:
+    name: Run OpenBallot-contracts release
+    secrets: inherit
+    uses: ./.github/workflows/OpenBallot-contracts-cd.yaml
+    needs: OpenBallot-contracts-validate
+
+  OpenBallot-frontend-validate:
+    name: Run OpenBallot-frontend release
+    secrets: inherit
+    uses: ./.github/workflows/OpenBallot-frontend-ci.yaml
+
+  OpenBallot-frontend-release:
+    name: Run OpenBallot-frontend release
+    secrets: inherit
+    uses: ./.github/workflows/OpenBallot-frontend-cd.yaml
+    needs: OpenBallot-frontend-validate
