@@ -1,30 +1,32 @@
-//src/components/JoinApp.tsx
-
+//./components/JoinApp.tsx
+import { consoleLogger } from '@algorandfoundation/algokit-utils/types/logging'
 import { useWallet } from '@txnlab/use-wallet'
 import { useState } from 'react'
-import { AppProps, JoinAppInterface } from '../types' // Import the interfaces
+import { JoinAppInterface } from '../types'
 
-const JoinApp = <T extends AppProps>({ openModal, closeModal, apps, onAppJoin, getAppId }: JoinAppInterface<T>) => {
+const JoinApp = ({ algorand, openModal, closeModal, onAppJoin }: JoinAppInterface) => {
   const { activeAddress } = useWallet()
-  const [appId, setAppId] = useState<string>('')
+  const [userInputAppId, setUserInputAppId] = useState<string>('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const handleJoinApp = () => {
+  const handleJoinApp = async () => {
+    const appId = BigInt(userInputAppId)
     try {
-      const inputAppId = BigInt(appId)
-      if (apps && apps.length > 0) {
-        const matchingApp = apps.find((app) => getAppId(app) === inputAppId)
-        if (!matchingApp) {
-          setErrorMessage('No app with that App ID. Please try again.')
-          return
-        }
-        setErrorMessage(null)
-        onAppJoin(matchingApp)
-      } else {
-        setErrorMessage(`No client with App ID: ${inputAppId}`)
+      // Fetch app details from Algorand using the provided App ID
+      const app = await algorand.app.getById(appId)
+
+      if (!app) {
+        setErrorMessage('No app with that App ID found on the blockchain. Please try again.')
+        return
       }
+
+      // Store the raw app client in the state
+      onAppJoin(appId)
+      setErrorMessage(null) // Clear any previous error messages
     } catch (error) {
-      setErrorMessage('Invalid App ID format. Please enter a valid ID number.')
+      // Handle errors, such as invalid ID format or fetch failure
+      consoleLogger.error('Error fetching App ID:', error)
+      setErrorMessage('Failed to fetch app details. Please ensure the App ID is correct.')
     }
   }
 
@@ -39,8 +41,8 @@ const JoinApp = <T extends AppProps>({ openModal, closeModal, apps, onAppJoin, g
               <input
                 type="text"
                 placeholder="Enter App ID"
-                value={appId}
-                onChange={(e) => setAppId(e.target.value)}
+                value={userInputAppId}
+                onChange={(e) => setUserInputAppId(e.target.value)}
                 className="input input-bordered"
               />
               <button type="button" className="btn text-black hover:text-white hover:bg-green-700" onClick={handleJoinApp}>

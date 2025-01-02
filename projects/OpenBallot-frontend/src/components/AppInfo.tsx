@@ -1,58 +1,96 @@
-//src/components/AppInfo.tsx
+import { useEffect, useState, useCallback } from 'react'
+import { AppInfoProps } from '../types'
+import { convertUnixToVoteDate } from '../utils/dates'
+import { consoleLogger } from '@algorandfoundation/algokit-utils/types/logging'
 
-import { useEffect } from 'react'
-import { AppProps } from '../types'
-import { formatVoteDateStrOnChainnn } from '../utils/dates'
+export const AppInfo = ({ algorand, appId, setUserMsg }: AppInfoProps) => {
+  const [appDetails, setAppDetails] = useState<{
+    appId: string
+    appAddress: string
+    creatorAddress: string
+    pollStartDate: string
+    pollEndDate: string
+  } | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-export const AppInfo = ({
-  app,
-  setUserMsg,
-}: {
-  app: AppProps | null
-  setUserMsg: (notification: { msg: string; style: string }) => void
-}) => {
-  useEffect(() => {
-    if (!app) {
-      // Set the notification for validation failure
-      setUserMsg({
-        msg: 'App ID not found',
-        style: 'text-red-700 font-bold',
+  const fetchAppDetails = useCallback(async () => {
+    if (!appId) return
+
+    try {
+      const appClient = await algorand.app.getById(appId)
+      if (!appClient) {
+        setError(`App with ID ${appId.toString()} not found.`)
+        setUserMsg({
+          msg: `App with ID ${appId.toString()} not found.`,
+          style: 'text-red-700 font-bold',
+        })
+        return
+      }
+
+      const appGlobalState = await algorand.app.getGlobalState(appId)
+
+      const pollStartDateUnixRaw = BigInt(appGlobalState['poll_start_date_unix']['value'])
+      const pollEndDateUnixRaw = BigInt(appGlobalState['poll_end_date_unix']['value'])
+
+      const pollStartDateStr = convertUnixToVoteDate(pollStartDateUnixRaw)
+      const pollEndDateStr = convertUnixToVoteDate(pollEndDateUnixRaw)
+
+      setAppDetails({
+        appId: appId.toString(),
+        appAddress: appClient.appAddress,
+        creatorAddress: appClient.creator,
+        pollStartDate: pollStartDateStr,
+        pollEndDate: pollEndDateStr,
       })
-    } else {
-      // Set the notification for success
+
       setUserMsg({
-        msg: `Successfully loaded client with App ID: ${app.appClient.appId.toString()}`,
+        msg: `Successfully loaded client with App ID: ${appId.toString()}`,
         style: 'text-green-700 font-bold',
       })
+    } catch (error) {
+      setError(`Failed to fetch app details for ID ${appId.toString()}.`)
+      setUserMsg({
+        msg: `Failed to fetch app details for ID ${appId.toString()}.`,
+        style: 'text-red-700 font-bold',
+      })
+      consoleLogger.error('Error fetching app details:', error)
     }
-  }, [app, setUserMsg]) // Ensure the effect runs when `app` changes
+  }, [algorand, appId, setUserMsg])
 
-  if (!app) {
-    return null // Avoid rendering if no app is found
+  useEffect(() => {
+    if (appId) fetchAppDetails()
+  }, [appId, fetchAppDetails])
+
+  if (error) {
+    return <div className="text-center text-red-700 font-bold mt-4">{error}</div>
+  }
+
+  if (!appDetails) {
+    return null // Avoid rendering if no app details are available
   }
 
   return (
     <div className="mt-4">
-      <div className="text-left justify-items-start">
+      <div className="text-left">
         <div>
           <span className="text-black text-[18px] font-bold italic">App ID: </span>
-          <span className="text-green-800 text-[18px] font-bold">{app.appClient.appId.toString()}</span>
+          <span className="text-green-800 text-[18px] font-bold">{appDetails.appId}</span>
         </div>
         <div>
           <span className="text-black text-[18px] font-bold italic">App Address: </span>
-          <span className="text-green-800 text-[18px] font-bold">{app.appClient.appAddress}</span>
+          <span className="text-green-800 text-[18px] font-bold">{appDetails.appAddress}</span>
         </div>
         <div>
           <span className="text-black text-[18px] font-bold italic">App Creator: </span>
-          <span className="text-green-800 text-[18px] font-bold">{app.creatorAddress}</span>
+          <span className="text-green-800 text-[18px] font-bold">{appDetails.creatorAddress}</span>
         </div>
         <div>
           <span className="text-black text-[18px] font-bold italic">Vote Start Date: </span>
-          <span className="text-green-800 text-[18px] font-bold">{formatVoteDateStrOnChainnn(app.poll.startDate)}</span>
+          <span className="text-green-800 text-[18px] font-bold">{appDetails.pollStartDate}</span>
         </div>
         <div>
           <span className="text-black text-[18px] font-bold italic">Vote End Date: </span>
-          <span className="text-green-800 text-[18px] font-bold">{formatVoteDateStrOnChainnn(app.poll.endDate)}</span>
+          <span className="text-green-800 text-[18px] font-bold">{appDetails.pollEndDate}</span>
         </div>
       </div>
     </div>

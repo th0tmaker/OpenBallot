@@ -1,13 +1,20 @@
 //src/types.ts
 
-import { OpenBallotClient } from './contracts/OpenBallot'
+//src/types.ts
+
+import { AlgorandClient } from '@algorandfoundation/algokit-utils'
 
 // Interfaces for types
 export interface AppProps {
-  appClient: OpenBallotClient
+  appId: bigint
+  appAddress: string
   creatorAddress: string
-  poll: PollProps
-  // accountsOptedIn: string[]
+  pollTitle: string
+  pollChoice1: string
+  pollChoice2: string
+  pollChoice3: string
+  pollStartDate: string
+  pollEndDate: string
 } // define interface with the desired App properties
 
 export interface PollProps {
@@ -17,10 +24,15 @@ export interface PollProps {
   endDate: string
 } // define interface with the desired poll properties
 
-export interface JoinAppInterface<T> {
+export interface JoinAppInterface {
+  algorand: AlgorandClient
   openModal: boolean
   closeModal: () => void
-  apps: T[]
-  onAppJoin: (app: T) => void
-  getAppId: (app: T) => bigint
+  onAppJoin: (appId: bigint) => void
+}
+
+export interface AppInfoProps {
+  algorand: AlgorandClient
+  appId?: bigint // Allow appId to be undefined
+  setUserMsg: (notification: { msg: string; style: string }) => void
 }
