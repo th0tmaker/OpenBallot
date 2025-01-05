@@ -5,21 +5,29 @@ import { AppProps, PollProps } from '../types'
 export const convertVoteDateToUnix = (dateStr: string): number => {
   const [year, month, day] = dateStr.split('-')
   const date = new Date(Number(year), Number(month) - 1, Number(day))
+
   return Math.floor(date.getTime() / 1000)
 }
 
 export const convertUnixToVoteDate = (unixTimestamp: bigint): string => {
-  // Convert the bigint to a number
-  const timestamp = Number(unixTimestamp) * 1000 // Multiply by 1000 to convert seconds to milliseconds
+  // Convert Unix timestamp to milliseconds
+  const timestamp = Number(unixTimestamp) * 1000
+
+  // Create a Date object
   const date = new Date(timestamp)
 
-  // Format the date to DD/MM/YYYY
-  const day = String(date.getUTCDate()).padStart(2, '0') // Day
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0') // Month is zero-indexed
-  const year = date.getUTCFullYear() // Year
+  // Adjust for your timezone (GMT+1 is +60 minutes)
+  const offsetInMs = 60 * 60 * 1000 // 1 hour in milliseconds
+  const localDate = new Date(date.getTime() + offsetInMs)
+
+  // Format the adjusted date as DD/MM/YYYY
+  const day = String(localDate.getUTCDate()).padStart(2, '0')
+  const month = String(localDate.getUTCMonth() + 1).padStart(2, '0') // Month is zero-indexed
+  const year = localDate.getUTCFullYear()
 
   return `${day}/${month}/${year}`
 }
+
 export const formatVoteDateStrOnChain = (dateStr: string): string => {
   const [year, month, day] = dateStr.split('-') // Expected input: "YYYY-MM-DD"
   return `${day}/${month}/${year}` // Expected output: "DD/MM/YYYY"

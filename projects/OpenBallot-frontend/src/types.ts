@@ -36,3 +36,18 @@ export interface AppInfoProps {
   appId?: bigint // Allow appId to be undefined
   setUserMsg: (notification: { msg: string; style: string }) => void
 }
+
+// export interface UIState {
+//   openWalletModal: boolean
+//   openJoinModal: boolean
+//   isHomeActive: boolean
+//   isPollActive: boolean
+//   isVotingActive: boolean
+//   isPollValid: boolean
+//   userOptedIn: boolean
+// }
+
+// export interface UserMessage {
+//   msg: string
+//   style: string
+// }

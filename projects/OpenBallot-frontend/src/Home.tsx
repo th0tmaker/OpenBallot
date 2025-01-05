@@ -3,7 +3,7 @@
 import * as algokit from '@algorandfoundation/algokit-utils'
 import { consoleLogger } from '@algorandfoundation/algokit-utils/types/logging'
 import { useWallet } from '@txnlab/use-wallet'
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { AppInfo } from './components/AppInfo'
 import ConnectWallet from './components/ConnectWallet'
 import JoinApp from './components/JoinApp'
@@ -61,6 +61,10 @@ const Home: React.FC = () => {
   const [votingStatus, setVotingStatus] = useState({ isOpen: false, message: 'No' })
   const [isPollValid, setIsPollValid] = useState(false)
 
+  // Add a ref to track if we've already fetched the app state
+  const hasLoadedApp = useRef<{ [key: string]: boolean }>({})
+  const prevAppState = useRef<AppProps | null>(null) // Can also initialize with null or an empty object
+
   // *MANAGE LIFECYCLE SIDE EFFECTS*
   useEffect(() => {
     if (pollParams) {
@@ -68,24 +72,39 @@ const Home: React.FC = () => {
     }
   }, [pollParams, isPollActive, setUserMsg])
 
-  // App state fetch effect
+  // Modify the app state fetch effect
   useEffect(() => {
-    if (currentAppId) {
+    if (currentAppId && !hasLoadedApp.current[currentAppId.toString()]) {
       fetchAppGlobalState()
-      consoleLogger.info('USE EFF poll title', currentApp?.pollTitle)
-      consoleLogger.info('USE EFF poll choice 1', currentApp?.pollChoice1)
-      consoleLogger.info('USE EFF start date', currentApp?.pollStartDate)
-      consoleLogger.info('USE EFF end date', currentApp?.pollEndDate)
+      consoleLogger.info('Fetching APP ID Global STate:', currentAppId.toString)
     }
   }, [currentAppId]) // Dependency array ensures side effects run only when dependencies change
 
-  // Voting status effect
+  // Add a debug effect to monitor state changes
   useEffect(() => {
     if (currentApp) {
-      const status = date.isVotingOpen(currentApp)
-      setVotingStatus(status)
+      const { pollTitle, pollChoice1, pollChoice2, pollChoice3, pollStartDate, pollEndDate } = currentApp
+      const prevState = prevAppState.current
+
+      // Check if any of the relevant fields have changed
+      if (
+        !prevState ||
+        pollTitle !== prevState.pollTitle ||
+        pollChoice1 !== prevState.pollChoice1 ||
+        pollChoice2 !== prevState.pollChoice2 ||
+        pollChoice3 !== prevState.pollChoice3 ||
+        pollStartDate !== prevState.pollStartDate ||
+        pollEndDate !== prevState.pollEndDate
+      ) {
+        const status = date.isVotingOpen(currentApp)
+        setVotingStatus(status)
+        consoleLogger.info('Current app state updated:', { pollTitle, pollChoice1, pollChoice2, pollChoice3, pollStartDate, pollEndDate })
+      }
+
+      // Update the previous state
+      prevAppState.current = { ...currentApp }
     }
-  }, [isVotingActive, currentApp])
+  }, [currentApp, isVotingActive]) // Trigger only when currentApp changes // Trigger only when currentApp changes
 
   // * BUTTON ON-CLICK EVENTS*
   // Toggle wallet modal state true or false
@@ -122,6 +141,9 @@ const Home: React.FC = () => {
 
   const handleAppJoin = async (appId: bigint) => {
     try {
+      // Reset the loaded state for this app if we're explicitly joining it
+      hasLoadedApp.current[appId.toString()] = false
+
       consoleLogger.info('join app id', appId)
       setCurrentAppId(appId)
       setIsVotingActive(true)
@@ -132,16 +154,17 @@ const Home: React.FC = () => {
     }
   }
 
-  const fetchAppGlobalState = async () => {
-    if (!currentAppId) {
-      consoleLogger.info('No App ID available to fetch global state.')
-      return // Exit early if currentAppId is null
+  // Memoize the fetch function
+  const fetchAppGlobalState = useCallback(async () => {
+    if (!currentAppId) return
+
+    // Skip if we've already loaded this app's state
+    if (hasLoadedApp.current[currentAppId.toString()]) {
+      return
     }
 
     try {
-      const app = await algorand.app.getById(currentAppId) // Fetch app details
-      consoleLogger.info('Fetched app details:', app)
-
+      const app = await algorand.app.getById(currentAppId)
       const appGlobalState = app.globalState
 
       // Extract fields from the global state
@@ -152,28 +175,28 @@ const Home: React.FC = () => {
       const pollStartDate = appGlobalState['poll_start_date_unix']?.value
       const pollEndDate = appGlobalState['poll_end_date_unix']?.value
 
-      // Convert UNIX timestamps to human-readable dates
       const pollStartDateStr = date.convertUnixToVoteDate(BigInt(pollStartDate ?? 0))
       const pollEndDateStr = date.convertUnixToVoteDate(BigInt(pollEndDate ?? 0))
 
-      // Update the currentApp state with the retrieved values
-      setCurrentApp({
+      const newAppState: AppProps = {
         appId: app.appId,
         appAddress: app.appAddress,
         creatorAddress: app.creator,
-        pollTitle: String(pollTitle), // Convert to string
-        pollChoice1: String(pollChoice1), // Convert to string
-        pollChoice2: String(pollChoice2), // Convert to string
-        pollChoice3: String(pollChoice3), // Convert to string
+        pollTitle: String(pollTitle),
+        pollChoice1: String(pollChoice1),
+        pollChoice2: String(pollChoice2),
+        pollChoice3: String(pollChoice3),
         pollStartDate: pollStartDateStr,
         pollEndDate: pollEndDateStr,
-      })
-      consoleLogger.info('poll title', currentApp?.pollTitle)
-      consoleLogger.info('poll choice 1', currentApp?.pollChoice1)
+      }
+
+      setCurrentApp(newAppState)
+      // Mark this app as loaded
+      hasLoadedApp.current[currentAppId.toString()] = true
     } catch (error) {
       consoleLogger.error('Failed to fetch app global state:', error)
     }
-  }
+  }, [currentAppId, algorand.app])
 
   // Run when start button is clicked
   const handleStartClick = () => {
@@ -362,7 +385,6 @@ const Home: React.FC = () => {
 
       // Creating a new instance of the App client
       const appClient = await method.createApp(algorand, activeAddress)
-
       // App creator pays Global schema MBR cost
       await method.payGlobalMbrCost(algorand, activeAddress, appClient.appId)
 
@@ -384,9 +406,6 @@ const Home: React.FC = () => {
       setCurrentAppId(appClient.appId)
 
       // Now you can access appClient and its state for the new app
-
-      // const choice1VoteCount = await appClient.state.global.choice1VoteCount()
-      // consoleLogger.info('Choice 1 Vote Count:', choice1VoteCount)
 
       // Wait for the app creation transaction to be completed, then set vote dates
     } catch (error) {
@@ -469,7 +488,7 @@ const Home: React.FC = () => {
             // Poll Creation Section
             <div>
               <div className="mt-2 max-w-2xl mx-auto">
-                <form onSubmit={handlePollSubmit} className="space-y-2 bg-white p-4 rounded-lg shadow-lgb border-2 border-black">
+                <form className="space-y-2 bg-white p-4 rounded-lg shadow-lgb border-2 border-black">
                   <h2 className="text-4xl font-bold text-center mb-4">Create New Poll</h2>
 
                   <div className="space-y-4">

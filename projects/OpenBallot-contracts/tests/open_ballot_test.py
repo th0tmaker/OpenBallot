@@ -233,13 +233,13 @@ def test_setup_poll(algorand: AlgorandClient, app_client: OpenBallotClient) -> N
     choice3 = b""
 
     # Choose a start date that won't trip method assertions
-    start_date_str = "12/22/2024"  #  write date as a string in specified format
+    start_date_str = "01/02/2025"  #  write date as a string in specified format
     start_date_unix = int(
         time.mktime(time.strptime(start_date_str, date_format))
     )  # Obtain start date unix via time module by passing the start date string and the date format
 
     # Choose an end date that won't trip method assertions
-    end_date_str = "01/05/2025"  #  write date as a string in specified format
+    end_date_str = "01/10/2025"  #  write date as a string in specified format
     end_date_unix = int(
         time.mktime(time.strptime(end_date_str, date_format))
     )  # Obtain end date unix via time module by passing the start date string and the date format
