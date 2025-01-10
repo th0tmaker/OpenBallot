@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback } from 'react'
+import { consoleLogger } from '@algorandfoundation/algokit-utils/types/logging'
+import { useCallback, useEffect, useState } from 'react'
 import { AppInfoProps } from '../types'
 import { convertUnixToVoteDate } from '../utils/dates'
-import { consoleLogger } from '@algorandfoundation/algokit-utils/types/logging'
 
 export const AppInfo = ({ algorand, appId, setUserMsg }: AppInfoProps) => {
   const [appDetails, setAppDetails] = useState<{

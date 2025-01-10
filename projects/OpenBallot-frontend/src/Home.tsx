@@ -8,15 +8,9 @@ import { AppInfo } from './components/AppInfo'
 import ConnectWallet from './components/ConnectWallet'
 import JoinApp from './components/JoinApp'
 import * as method from './methods'
-import { AppProps, PollProps } from './types'
+import { AppProps, PollProps, UISectionState } from './types'
 import * as date from './utils/dates'
 import { getAlgodConfigFromViteEnvironment } from './utils/network/getAlgoClientConfigs'
-
-// Configure console logger
-algokit.Config.configure({
-  debug: true,
-  logger: consoleLogger,
-})
 
 // Algorand client setup
 const algodConfig = getAlgodConfigFromViteEnvironment()
@@ -30,7 +24,7 @@ const Home: React.FC = () => {
   algorand.setDefaultSigner(signer) // pass the signer object from the wallet as the default signer for every transaction
 
   // Poll state variables hooked via PollProps interface
-  const [pollParams, setPollParams] = useState<PollProps>({
+  const [userPollInputs, setUserPollInputs] = useState<PollProps>({
     title: '',
     choices: ['', '', ''],
     startDate: '',
@@ -39,12 +33,7 @@ const Home: React.FC = () => {
 
   // Vote choice state variable
   const [voteChoice, setVoteChoice] = useState<bigint | null>(null)
-  const [userOptedIn, setUserOptedIn] = useState(false)
-
-  // Boolean flags to track what screen is being rendered
-  const [isHomeActive, setIsHomeActive] = useState(true) // track if home section should be rendered
-  const [isPollActive, setIsPollActive] = useState(false) // track if poll section should be rendered
-  const [isVotingActive, setIsVotingActive] = useState(false) // track if voting section should be rendered
+  const [selectedChoice, setSelectedChoice] = useState<{ index: number | null; text: string }>({ index: null, text: '' })
 
   // State variable for notification message and its styling
   const [userMsg, setUserMsg] = useState<{ msg: string; style: string }>({
@@ -56,55 +45,89 @@ const Home: React.FC = () => {
 
   // State for created and joined apps
   const [currentAppId, setCurrentAppId] = useState<bigint | null>(null)
-  const [currentApp, setCurrentApp] = useState<AppProps | null>(null) // Store the selected app
+  const [currentApp, setCurrentApp] = useState<AppProps | null>(null)
 
   const [votingStatus, setVotingStatus] = useState({ isOpen: false, message: 'No' })
   const [isPollValid, setIsPollValid] = useState(false)
 
   // Add a ref to track if we've already fetched the app state
   const hasLoadedApp = useRef<{ [key: string]: boolean }>({})
-  const prevAppState = useRef<AppProps | null>(null) // Can also initialize with null or an empty object
+  const prevAppState = useRef<AppProps | null>(null)
+
+  const [isOptInBtnDisabled, setIsOptInBtnDisabled] = useState<boolean>(false)
+  const [isSubmitBtnDisabled, setIsSubmitBtnDisabled] = useState<boolean>(false)
+
+  const [activeSection, setActiveSection] = useState<UISectionState>('HOME')
+
+  const [isActionLoading, setIsActionLoading] = useState(false)
 
   // *MANAGE LIFECYCLE SIDE EFFECTS*
+
   useEffect(() => {
-    if (pollParams) {
-      setIsPollValid(date.processPollInputs(pollParams, isPollActive, setUserMsg))
+    if (userPollInputs && activeSection === 'CREATION') {
+      setIsPollValid(date.processPollInputs(userPollInputs, activeSection === 'CREATION', setUserMsg))
     }
-  }, [pollParams, isPollActive, setUserMsg])
+  }, [userPollInputs, activeSection, setUserMsg])
 
-  // Modify the app state fetch effect
+  // Update the useEffect to use the new combined query
+  // Effect to check global state
   useEffect(() => {
-    if (currentAppId && !hasLoadedApp.current[currentAppId.toString()]) {
-      fetchAppGlobalState()
-      consoleLogger.info('Fetching APP ID Global STate:', currentAppId.toString)
-    }
-  }, [currentAppId]) // Dependency array ensures side effects run only when dependencies change
+    const loadGlobalState = async () => {
+      if (!currentAppId || hasLoadedApp.current[currentAppId.toString()]) return
 
-  // Add a debug effect to monitor state changes
-  useEffect(() => {
-    if (currentApp) {
-      const { pollTitle, pollChoice1, pollChoice2, pollChoice3, pollStartDate, pollEndDate } = currentApp
-      const prevState = prevAppState.current
-
-      // Check if any of the relevant fields have changed
-      if (
-        !prevState ||
-        pollTitle !== prevState.pollTitle ||
-        pollChoice1 !== prevState.pollChoice1 ||
-        pollChoice2 !== prevState.pollChoice2 ||
-        pollChoice3 !== prevState.pollChoice3 ||
-        pollStartDate !== prevState.pollStartDate ||
-        pollEndDate !== prevState.pollEndDate
-      ) {
-        const status = date.isVotingOpen(currentApp)
-        setVotingStatus(status)
-        consoleLogger.info('Current app state updated:', { pollTitle, pollChoice1, pollChoice2, pollChoice3, pollStartDate, pollEndDate })
+      try {
+        consoleLogger.info('Fetching APP ID Global State...')
+        await queryGlobalState()
+        hasLoadedApp.current[currentAppId.toString()] = true
+      } catch (error) {
+        consoleLogger.error('Error loading global state:', error)
       }
-
-      // Update the previous state
-      prevAppState.current = { ...currentApp }
     }
-  }, [currentApp, isVotingActive]) // Trigger only when currentApp changes // Trigger only when currentApp changes
+
+    loadGlobalState()
+  }, [currentAppId, hasLoadedApp])
+
+  // Effect to check local state
+  useEffect(() => {
+    const loadLocalState = async () => {
+      if (!currentApp?.appId) return
+
+      try {
+        // Update voting status
+        const status = date.isVotingOpen(currentApp.pollStartDateUnix, currentApp.pollEndDateUnix)
+        setVotingStatus(status) // Schedule state update
+        consoleLogger.info('Voting Status:', status) // Use local `status` immediately
+
+        if (activeAddress) {
+          consoleLogger.info('Fetching APP ID Account Local State...')
+          const { optedIn, localVoteStatus, localVoteChoice } = await queryLocalState(currentApp.appId, activeAddress)
+
+          // Update button states immediately
+          const isOptInDisabled = optedIn
+          const isSubmitDisabled = !optedIn || !status.isOpen || localVoteStatus === 1
+
+          setIsOptInBtnDisabled(isOptInDisabled)
+          setIsSubmitBtnDisabled(isSubmitDisabled)
+
+          // Use local values for immediate adjustments
+          const updatedApp = {
+            ...currentApp,
+            pollVoteStatus: localVoteStatus,
+            pollVoteChoice: localVoteChoice,
+            isOptedIn: optedIn,
+          }
+
+          setCurrentApp(updatedApp) // Schedule state update
+
+          consoleLogger.info('Updated Current App:', updatedApp)
+        }
+      } catch (error) {
+        consoleLogger.error('Error loading local state:', error)
+      }
+    }
+
+    loadLocalState()
+  }, [currentApp?.appId, activeAddress, currentApp?.isOptedIn, currentApp?.pollVoteStatus])
 
   // * BUTTON ON-CLICK EVENTS*
   // Toggle wallet modal state true or false
@@ -123,22 +146,6 @@ const Home: React.FC = () => {
     setOpenJoinModal((prev) => !prev)
   }
 
-  // const checkAccountLocalState = async (appId: bigint, address: string) => {
-  //   try {
-  //     const appLocalState = (await algorand.client.algod.accountApplicationInformation(address, Number(appId)).do())[
-  //       'apps-local-state'
-  //     ]?.find((app: { id: number }) => app.id === Number(appId))
-
-  //     return {
-  //       isOptedIn: !!appLocalState,
-  //       keyValues: appLocalState?.['key-value'] || null,
-  //     }
-  //   } catch (error) {
-  //     consoleLogger.error('Error:', error)
-  //     return { isOptedIn: false, keyValues: null }
-  //   }
-  // }
-
   const handleAppJoin = async (appId: bigint) => {
     try {
       // Reset the loaded state for this app if we're explicitly joining it
@@ -146,7 +153,8 @@ const Home: React.FC = () => {
 
       consoleLogger.info('join app id', appId)
       setCurrentAppId(appId)
-      setIsVotingActive(true)
+      setActiveSection('ENGAGEMENT')
+      setOpenJoinModal(false)
       return true
     } catch (error) {
       consoleLogger.error('Error fetching app client or global state:', error)
@@ -154,8 +162,8 @@ const Home: React.FC = () => {
     }
   }
 
-  // Memoize the fetch function
-  const fetchAppGlobalState = useCallback(async () => {
+  // // Memoize the fetch function
+  const queryGlobalState = useCallback(async () => {
     if (!currentAppId) return
 
     // Skip if we've already loaded this app's state
@@ -188,15 +196,47 @@ const Home: React.FC = () => {
         pollChoice3: String(pollChoice3),
         pollStartDate: pollStartDateStr,
         pollEndDate: pollEndDateStr,
+        pollStartDateUnix: BigInt(pollStartDate),
+        pollEndDateUnix: BigInt(pollEndDate),
+        pollVoteStatus: null,
+        pollVoteChoice: null,
+        isOptedIn: false,
       }
 
       setCurrentApp(newAppState)
+
       // Mark this app as loaded
       hasLoadedApp.current[currentAppId.toString()] = true
     } catch (error) {
       consoleLogger.error('Failed to fetch app global state:', error)
     }
   }, [currentAppId, algorand.app])
+
+  const queryLocalState = async (appId: bigint, address: string) => {
+    try {
+      const accountAppInfo = await algorand.client.algod.accountApplicationInformation(address, Number(appId)).do()
+
+      // Check if the account has an app-local-state
+      const accountLocalState = accountAppInfo['app-local-state']
+      if (!accountLocalState) {
+        consoleLogger.info('Account is NOT opted in.')
+        return { optedIn: false, localVoteStatus: null, localVoteChoice: null }
+      }
+
+      // Extract local vote status if it exists
+      const accountLocalVoteStatus = Number(accountLocalState['key-value']?.[1]?.['value']?.['uint']) // Safely handle key-value access
+      const accountLocalVoteChoice = Number(accountLocalState['key-value']?.[0]?.['value']?.['uint']) // Safely handle key-value access
+
+      consoleLogger.info('Account is opted in to:', appId.toString())
+      consoleLogger.info('Checking local vote status:', accountLocalVoteStatus)
+      consoleLogger.info('Checking local vote choice:', accountLocalVoteChoice)
+
+      return { optedIn: true, localVoteStatus: accountLocalVoteStatus ?? null, localVoteChoice: accountLocalVoteChoice ?? null }
+    } catch (error) {
+      consoleLogger.error('Error querying local state:', error)
+      return { optedIn: false, localVoteStatus: null, localVoteChoice: null } // Return a default structure on error
+    }
+  }
 
   // Run when start button is clicked
   const handleStartClick = () => {
@@ -207,22 +247,21 @@ const Home: React.FC = () => {
       setUserMsg({ msg: '', style: '' })
 
       // User has connected wallet and presses Start
-      setIsHomeActive(false)
-      setIsPollActive(true) // Show poll section
+      setActiveSection('CREATION')
     }
   }
 
   // Run when cancel button is clicked
   const handleCancelClick = () => {
-    setPollParams({
+    setUserPollInputs({
       title: '',
       choices: ['', '', ''],
       startDate: '',
       endDate: '',
     })
-    setIsHomeActive(true)
-    setIsPollActive(false)
-    setIsVotingActive(false)
+
+    setActiveSection('HOME')
+
     setOpenJoinModal(false)
     // setSelectedApp(null)
     setVoteChoice(null)
@@ -235,17 +274,18 @@ const Home: React.FC = () => {
   const handleSubmitClick = async () => {
     // Ensure a vote choice is selected
     if (voteChoice === null) {
+      setUserMsg({ msg: 'Choice selection required', style: 'text-red-700 font-bold' })
       consoleLogger.error('Vote choice is missing.')
       return
     }
 
     await submitVote()
 
-    setIsVotingActive(false)
-    setIsPollActive(false)
-    setIsHomeActive(true)
+    // setIsVotingActive(false)
+    // setIsPollActive(false)
+    // setIsHomeActive(true)
 
-    setPollParams({
+    setUserPollInputs({
       title: '',
       choices: ['', '', ''],
       startDate: '',
@@ -271,14 +311,16 @@ const Home: React.FC = () => {
       await method.deleteApp(algorand, currentApp.creatorAddress, currentApp?.appId)
       consoleLogger.info('Deletion method successful for App ID:', currentApp?.appId)
 
+      setCurrentAppId(null)
+      setCurrentApp(null)
+
       // Remove app from the app list
       setUserMsg({
         msg: `App with ID: ${currentApp?.appId.toString()} successfully deleted`,
         style: 'text-green-700 font-bold',
       })
 
-      setIsVotingActive(false) // Adjust app state after deletion
-      setIsHomeActive(true)
+      setActiveSection('HOME')
     } catch (error) {
       consoleLogger.error('Error:', error)
       setUserMsg({
@@ -299,14 +341,36 @@ const Home: React.FC = () => {
       return
     }
 
+    if (currentApp?.isOptedIn) {
+      consoleLogger.error('This address is already opted in to App client with ID: ', currentApp?.appId)
+      return
+    }
+
+    if (isActionLoading) return // Prevent triggering if already running
+    setIsActionLoading(true)
+
     try {
       await method.optIn(algorand, activeAddress, currentApp?.appId)
-      setUserOptedIn(true)
+
+      // Use local values for immediate adjustments
+      const updatedApp = {
+        ...currentApp,
+        isOptedIn: true,
+      }
+
+      setCurrentApp(updatedApp) // Schedule state update
+
+      // Immediately disable the button
+      // setIsOptInBtnDisabled(true)
+      // setIsSubmitBtnDisabled(false)
+
       consoleLogger.info(activeAddress, 'has been successfully opted in to App ID:', currentApp?.appId)
       setUserMsg({ msg: 'Account opt-in successful', style: 'text-green-700 font-bold' })
     } catch (error) {
       consoleLogger.error('Error:', error)
       setUserMsg({ msg: 'Account opt-in failed', style: 'text-red-700 font-bold' })
+    } finally {
+      setIsActionLoading(false) // Unlock the action
     }
   }
 
@@ -321,14 +385,30 @@ const Home: React.FC = () => {
       return
     }
 
+    if (isActionLoading) return // Prevent triggering if already running
+    setIsActionLoading(true)
+
     try {
       await method.optOut(algorand, activeAddress, currentApp?.appId)
-      setUserOptedIn(true)
+
+      // Use local values for immediate adjustments
+      const updatedApp = {
+        ...currentApp,
+        isOptedIn: false,
+      }
+
+      setCurrentApp(updatedApp) // Schedule state update
+
+      // Immediately enable opt in button
+      //setIsOptInBtnDisabled(false)
+
       consoleLogger.info(activeAddress, 'has been successfully opted out of App ID:', currentApp?.appId)
       setUserMsg({ msg: 'Account opt-out successful', style: 'text-green-700 font-bold' })
     } catch (error) {
       consoleLogger.error('Error:', error)
       setUserMsg({ msg: 'Account opt-out failed', style: 'text-red-700 font-bold' })
+    } finally {
+      setIsActionLoading(false)
     }
   }
 
@@ -342,16 +422,12 @@ const Home: React.FC = () => {
 
       // Ensure currentApp is available
       if (!currentApp) {
-        consoleLogger.error('No app selected or available to opt out of.')
+        consoleLogger.error('No app selected or available.')
         return
       }
 
-      // Get the appId from currentApp
-      const currentAppId = currentApp?.appId
-
-      // Ensure the appId is available
-      if (!currentAppId) {
-        consoleLogger.error('App ID is missing for the selected app.')
+      if (!votingStatus.isOpen) {
+        consoleLogger.error('Can not submit vote if voting is closed!')
         return
       }
 
@@ -361,16 +437,32 @@ const Home: React.FC = () => {
         return
       }
 
+      if (isActionLoading) return // Prevent triggering if already running
+      setIsActionLoading(true)
+
       // Call the submitVote method
-      consoleLogger.info(`Submitting vote through App with ID: ${currentAppId.toString()} with choice: ${voteChoice}`)
-      await method.submitVote(algorand, activeAddress, currentAppId, voteChoice)
+      consoleLogger.info(`Submitting vote through App with ID: ${currentApp.appId.toString()} with choice: ${voteChoice}`)
+      await method.submitVote(algorand, activeAddress, currentApp.appId, voteChoice)
+
+      // Use local values for immediate adjustments
+      const updatedApp = {
+        ...currentApp,
+        pollVoteStatus: 1,
+        pollVoteChoice: Number(voteChoice),
+      }
+
+      setCurrentApp(updatedApp) // Schedule state update
+
+      setIsSubmitBtnDisabled(true)
 
       setUserMsg({ msg: 'Your vote has been successfully submitted! Thank you for participating!', style: 'text-green-700 font-bold' })
 
-      consoleLogger.info(`Vote successfully submitted for app ID: ${currentAppId.toString()}`)
+      consoleLogger.info(`Vote successfully submitted for app ID: ${currentApp.appId.toString()}`)
       consoleLogger.info(`Vote successfully submitted for user address: ${activeAddress}`)
     } catch (error) {
       consoleLogger.error('Error submitting vote:', error)
+    } finally {
+      setIsActionLoading(false)
     }
   }
 
@@ -379,12 +471,13 @@ const Home: React.FC = () => {
   const initApp = async () => {
     try {
       if (!activeAddress) {
-        consoleLogger.info('logger: Please connect a wallet!')
+        consoleLogger.info('Please connect a wallet!')
         return
       }
 
       // Creating a new instance of the App client
       const appClient = await method.createApp(algorand, activeAddress)
+
       // App creator pays Global schema MBR cost
       await method.payGlobalMbrCost(algorand, activeAddress, appClient.appId)
 
@@ -393,14 +486,14 @@ const Home: React.FC = () => {
         algorand,
         activeAddress,
         appClient.appId,
-        pollParams.title,
-        pollParams.choices[0],
-        pollParams.choices[1],
-        pollParams.choices[2],
-        date.formatVoteDateStrOnChain(pollParams.startDate),
-        BigInt(date.convertVoteDateToUnix(pollParams.startDate)),
-        date.formatVoteDateStrOnChain(pollParams.endDate),
-        BigInt(date.convertVoteDateToUnix(pollParams.endDate)),
+        userPollInputs.title,
+        userPollInputs.choices[0],
+        userPollInputs.choices[1],
+        userPollInputs.choices[2],
+        date.formatVoteDateStrOnChain(userPollInputs.startDate),
+        BigInt(date.convertVoteDateToUnix(userPollInputs.startDate)),
+        date.formatVoteDateStrOnChain(userPollInputs.endDate),
+        BigInt(date.convertVoteDateToUnix(userPollInputs.endDate)),
       )
 
       setCurrentAppId(appClient.appId)
@@ -415,34 +508,31 @@ const Home: React.FC = () => {
 
   const handlePollSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (isActionLoading) return // Prevent triggering if already running
+    setIsActionLoading(true)
+
     try {
       await initApp()
-      setIsPollActive(false)
-      setIsVotingActive(true)
+      setActiveSection('ENGAGEMENT')
     } catch (error) {
       consoleLogger.error('Error submitting poll:', error)
+    } finally {
+      setIsActionLoading(false) // Unlock the action
     }
   }
 
-  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
-    const newTitle = e.target.value
-    setPollParams((prev) => ({ ...prev, title: newTitle }))
+  const handlePollInputChangeByName = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    const { name, value } = e.target
+    setUserPollInputs((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleChoiceChange = (index: number, value: string): void => {
-    const newChoices = [...pollParams.choices]
-    newChoices[index] = value
-    setPollParams((prev) => ({ ...prev, choices: newChoices }))
-  }
-
-  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
-    const newStartDate = e.target.value
-    setPollParams((prev) => ({ ...prev, startDate: newStartDate }))
-  }
-
-  const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
-    const newEndDate = e.target.value
-    setPollParams((prev) => ({ ...prev, endDate: newEndDate }))
+  const handlePollChoicesArrayChange = (index: number, value: string): void => {
+    setUserPollInputs((prev) => {
+      const newChoices = [...prev.choices]
+      newChoices[index] = value
+      return { ...prev, choices: newChoices }
+    })
   }
 
   return (
@@ -451,7 +541,7 @@ const Home: React.FC = () => {
         <div className="max-w-full">
           <h1 className="pb-4 text-[56px] font-bold">Welcome to Brez Imena</h1>
           <p className={`mb-6 text-[20px] ${userMsg.style}`}>{userMsg.msg}</p>
-          {isHomeActive && !isPollActive && !isVotingActive && (
+          {activeSection === 'HOME' && (
             // Home Section
             <div className="grid justify-center">
               <button
@@ -484,8 +574,8 @@ const Home: React.FC = () => {
               <ConnectWallet openModal={openWalletModal} closeModal={toggleWalletModal} />
             </div>
           )}
-          {isPollActive && !isVotingActive && (
-            // Poll Creation Section
+          {activeSection === 'CREATION' && (
+            // Creation Section
             <div>
               <div className="mt-2 max-w-2xl mx-auto">
                 <form className="space-y-2 bg-white p-4 rounded-lg shadow-lgb border-2 border-black">
@@ -496,24 +586,30 @@ const Home: React.FC = () => {
                       <label className="block text-lg font-bold text-gray-700 mb-2">Poll Title</label>
                       <input
                         type="text"
+                        name="title"
                         placeholder="Title"
-                        value={pollParams.title}
-                        onChange={handleTitleChange}
-                        className={`w-full p-3 border rounded-md focus:outline-none ${pollParams.title ? 'border-2 border-green-500' : 'border-2 border-red-500'}`}
+                        autoComplete="off"
+                        value={userPollInputs.title}
+                        onChange={handlePollInputChangeByName}
+                        className={`w-full p-3 border rounded-md focus:outline-none ${
+                          userPollInputs.title ? 'border-2 border-green-500' : 'border-2 border-red-500'
+                        }`}
                         required
                       />
                     </div>
 
                     <div className="space-y-3">
                       <label className="block text-lg font-bold text-gray-700">Choices (required)</label>
-                      {pollParams.choices.map((choice, index) => (
+                      {userPollInputs.choices.map((choice, index) => (
                         <input
                           key={index}
                           type="text"
                           placeholder={`Choice ${index + 1}`}
                           value={choice}
-                          onChange={(e) => handleChoiceChange(index, e.target.value)}
-                          className={`w-full p-3 border rounded-md focus:outline-none ${pollParams.choices[index] ? 'border-2 border-green-500' : 'border-2 border-red-500'}`}
+                          onChange={(e) => handlePollChoicesArrayChange(index, e.target.value)}
+                          className={`w-full p-3 border rounded-md focus:outline-none ${
+                            userPollInputs.choices[index] ? 'border-2 border-green-500' : 'border-2 border-red-500'
+                          }`}
                           required
                         />
                       ))}
@@ -524,9 +620,13 @@ const Home: React.FC = () => {
                         <label className="block text-lg font-bold text-gray-700 mb-2">Start Date</label>
                         <input
                           type="date"
-                          value={pollParams.startDate}
-                          onChange={handleStartDateChange}
-                          className={`w-full p-3 border rounded-md focus:outline-none ${date.setUserVisualAidForDates(pollParams.startDate, pollParams)}`}
+                          name="startDate"
+                          value={userPollInputs.startDate}
+                          onChange={handlePollInputChangeByName}
+                          className={`w-full p-3 border rounded-md focus:outline-none ${date.setUserVisualAidForDates(
+                            userPollInputs.startDate,
+                            userPollInputs,
+                          )}`}
                           required
                         />
                       </div>
@@ -534,9 +634,13 @@ const Home: React.FC = () => {
                         <label className="block text-lg font-bold text-gray-700 mb-2">End Date</label>
                         <input
                           type="date"
-                          value={pollParams.endDate}
-                          onChange={handleEndDateChange}
-                          className={`w-full p-3 border rounded-md focus:outline-none ${date.setUserVisualAidForDates(pollParams.startDate, pollParams)}`}
+                          name="endDate"
+                          value={userPollInputs.endDate}
+                          onChange={handlePollInputChangeByName}
+                          className={`w-full p-3 border rounded-md focus:outline-none ${date.setUserVisualAidForDates(
+                            userPollInputs.startDate,
+                            userPollInputs,
+                          )}`}
                           required
                         />
                       </div>
@@ -553,7 +657,7 @@ const Home: React.FC = () => {
                     </button>
                     <button
                       type="submit"
-                      disabled={!isPollValid} // Use the state value here
+                      disabled={!isPollValid || isActionLoading} // Use the state value here
                       className={`btn w-40 h-14 justify-center rounded-md text-[24px] tracking-wide font-bold m-2 ${
                         isPollValid
                           ? 'bg-yellow-400 hover:bg-green-500 border-[3px] border-black hover:border-[4px] hover:border-green-700'
@@ -568,15 +672,18 @@ const Home: React.FC = () => {
               </div>
             </div>
           )}
-          {!isPollActive && isVotingActive && (
-            // Voting Section
+          {activeSection === 'ENGAGEMENT' && (
+            // Engagement Section
             <div className="voting-section mt-4 p-6 max-w-4xl bg-white rounded-lg shadow-lg border-2 border-black mx-auto">
-              <h1 className={`text-[34px] font-bold text-center mb-4 'text-gray-500'}`}>{currentApp?.pollTitle || 'No Title Available'}</h1>
-              <div className="space-y-4">
-                <p className="text-[20px] font-bold text-gray-800">
+              <h1 className={`text-[36px] font-bold text-center mb-4 underline`}>{currentApp?.pollTitle || 'No Title Available'}</h1>
+              <div className="space-y-2">
+                <p className="text-[20px] -mt-2 font-bold text-gray-800">
                   Is Voting Open:{' '}
                   <span className={votingStatus.isOpen ? 'font-bold text-green-700' : 'text-red-700'}>{votingStatus.message}</span>
                 </p>
+                {currentApp?.pollVoteStatus === 1 && (
+                  <p className="text-[20px] font-bold text-green-700">You have already submitted your vote for this poll!</p>
+                )}
                 <div>
                   <p className="text-[20px] text-left font-semibold underline mb-4">Choices:</p>
                   <ul className="space-y-2">
@@ -590,24 +697,29 @@ const Home: React.FC = () => {
                               name="vote"
                               value={choice}
                               className="form-radio h-5 w-5 text-green-500"
-                              onChange={() => setVoteChoice(BigInt(index + 1))}
-                              disabled={!userOptedIn}
+                              onChange={() => {
+                                setVoteChoice(BigInt(index + 1))
+                                setSelectedChoice({ index: index + 1, text: choice || '' })
+                              }}
+                              disabled={!isOptInBtnDisabled || isSubmitBtnDisabled || !votingStatus.isOpen}
                             />
-                            <label
-                              htmlFor={`choice-${index}`}
-                              className={`text-[20px] font-bold ${!userOptedIn ? 'text-gray-400' : 'text-black'}`}
-                            >
+                            <label htmlFor={`choice-${index}`} className={`text-[20px] font-bold 'text-gray-400' : 'text-black'}`}>
                               {choice || `Choice ${index + 1}`}
                             </label>
                           </li>
                         ),
                     )}
                   </ul>
+                  {currentApp?.pollVoteStatus === 1 && (
+                    <p className="text-[26px] font-bold text-gray-800">
+                      You have voted for choice: <span className="font-bold text-green-700">{selectedChoice.text}</span>
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="mt-6 flex justify-center gap-4">
                 <button
-                  disabled={userOptedIn} // Disable if user has not yet opted in
+                  disabled={isOptInBtnDisabled || isActionLoading} // Disable if user has already opted in
                   onClick={handleOptInClick} // Function to opt in
                   className="btn w-36 h-14 justify-center rounded-md text-[24px] tracking-wide font-bold bg-yellow-400 hover:bg-green-500 border-[3px] border-black hover:border-[4px] hover:border-green-700"
                 >
@@ -615,7 +727,7 @@ const Home: React.FC = () => {
                 </button>
 
                 <button
-                  disabled={!userOptedIn} // Disable if user has not yet opted in
+                  disabled={!isOptInBtnDisabled || isActionLoading} // Disable if user has not yet opted in
                   onClick={handleOptOutClick} // Function to handle opt out click
                   className="btn w-36 h-14 justify-center rounded-md text-[24px] tracking-wide font-bold bg-yellow-400 hover:bg-green-500 border-[3px] border-black hover:border-[4px] hover:border-green-700"
                 >
@@ -623,7 +735,7 @@ const Home: React.FC = () => {
                 </button>
 
                 <button
-                  disabled={!userOptedIn} // Disable if user has not yet opted in
+                  disabled={!isOptInBtnDisabled || isSubmitBtnDisabled || !votingStatus.isOpen || isActionLoading} // Disable if user has not yet opted in
                   onClick={handleSubmitClick} // Function to handle vote submission
                   className="btn w-36 h-14 justify-center rounded-md text-[24px] tracking-wide font-bold bg-yellow-400 hover:bg-green-500 border-[3px] border-black hover:border-[4px] hover:border-green-700"
                 >
@@ -647,10 +759,10 @@ const Home: React.FC = () => {
               </div>
             </div>
           )}
-          {/* AppId should alternate between createdAppId and joinedAppId */}
-          {isVotingActive &&
+          {/* App client basic information (displayed when engagement section is active)*/}
+          {activeSection === 'ENGAGEMENT' &&
             (currentAppId ? (
-              <AppInfo algorand={algorand} appId={currentApp?.appId} setUserMsg={setUserMsg} />
+              <AppInfo algorand={algorand} appId={currentAppId} setUserMsg={setUserMsg} />
             ) : (
               <p className="text-red-700">No valid App ID available for voting.</p>
             ))}

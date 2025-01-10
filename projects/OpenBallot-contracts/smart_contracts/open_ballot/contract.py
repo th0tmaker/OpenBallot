@@ -142,15 +142,6 @@ class OpenBallot(ARC4Contract):
             Application(Global.current_application_id.id)
         ), "Account must first be opted-in to App client in order to close out."
 
-        assert (  # Account is opted-in and hasn't voted yet
-            account.is_opted_in(Application(Global.current_application_id.id))
-            and self.local_vote_choice[account] == UInt64(0)
-        ) or (  # Account is opted-in and has voted and voting period is over
-            account.is_opted_in(Application(Global.current_application_id.id))
-            and self.local_vote_choice[account] != UInt64(0)
-            and Global.latest_timestamp > self.poll_end_date_unix
-        ), "Requirements for opting-out of App client are insufficient."
-
         # Delete the user's local storage
         del self.local_vote_status[account]
         del self.local_vote_choice[account]
@@ -173,7 +164,7 @@ class OpenBallot(ARC4Contract):
 
     # Define abimethod that allows the creator to set up the poll values
     @arc4.abimethod()
-    def setup_poll(
+    def set_poll(
         self,
         title: Bytes,
         choice1: Bytes,
@@ -185,9 +176,7 @@ class OpenBallot(ARC4Contract):
         end_date_unix: UInt64,
     ) -> None:
         # Make necessary assertions to verify transaction requirements
-        assert (
-            Txn.sender == Global.creator_address
-        ), "Only App creator can set vote dates."
+        assert Txn.sender == Global.creator_address, "Only App creator can set up poll."
 
         assert title.length <= UInt64(
             118

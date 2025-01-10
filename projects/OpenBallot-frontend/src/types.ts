@@ -1,7 +1,5 @@
 //src/types.ts
 
-//src/types.ts
-
 import { AlgorandClient } from '@algorandfoundation/algokit-utils'
 
 // Interfaces for types
@@ -15,6 +13,11 @@ export interface AppProps {
   pollChoice3: string
   pollStartDate: string
   pollEndDate: string
+  pollStartDateUnix: bigint
+  pollEndDateUnix: bigint
+  pollVoteStatus: number | null // Added for local state
+  pollVoteChoice: number | null // Added for local state
+  isOptedIn: boolean // Added to track opt-in status
 } // define interface with the desired App properties
 
 export interface PollProps {
@@ -36,6 +39,8 @@ export interface AppInfoProps {
   appId?: bigint // Allow appId to be undefined
   setUserMsg: (notification: { msg: string; style: string }) => void
 }
+
+export type UISectionState = 'HOME' | 'CREATION' | 'ENGAGEMENT'
 
 // export interface UIState {
 //   openWalletModal: boolean

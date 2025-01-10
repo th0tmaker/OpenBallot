@@ -1,6 +1,6 @@
 //./utils/dates.ts
 
-import { AppProps, PollProps } from '../types'
+import { PollProps } from '../types'
 
 export const convertVoteDateToUnix = (dateStr: string): number => {
   const [year, month, day] = dateStr.split('-')
@@ -95,17 +95,12 @@ export const processPollInputs = (
   return true
 }
 
-export const isVotingOpen = (AppDetails: AppProps): { isOpen: boolean; message: string } => {
-  const { pollStartDate, pollEndDate } = AppDetails
-
-  const startUnix = convertVoteDateToUnix(pollStartDate)
-  const endUnix = convertVoteDateToUnix(pollEndDate)
-
+export const isVotingOpen = (pollStartDateUnix: bigint, pollEndDateUnix: bigint): { isOpen: boolean; message: string } => {
   // Get the current Unix time
   const currentUnix = Math.floor(Date.now() / 1000)
 
   // Determine if voting is open
-  if (currentUnix >= startUnix && currentUnix <= endUnix) {
+  if (currentUnix >= pollStartDateUnix && currentUnix <= pollEndDateUnix) {
     return { isOpen: true, message: 'Yes' }
   } else {
     return { isOpen: false, message: 'No' }

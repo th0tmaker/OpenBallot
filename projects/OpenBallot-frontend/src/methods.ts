@@ -180,3 +180,17 @@ export async function deleteApp(algorand: AlgorandClient, creator: string, appId
     method: 'terminate',
   })
 }
+
+// Clear State
+export async function clearState(algorand: AlgorandClient, sender: string, appId: bigint) {
+  // Get App Factory
+  const factory = algorand.client.getTypedAppFactory(OpenBallotFactory)
+
+  // Get App client through factory by passing client App ID
+  const client = factory.getAppClientById({ appId })
+
+  await client.send.clearState({
+    sender: sender,
+    signer: algorand.account.getSigner(sender),
+  })
+}
