@@ -1,6 +1,6 @@
 import { consoleLogger } from '@algorandfoundation/algokit-utils/types/logging'
 import { useCallback, useEffect, useState } from 'react'
-import { AppInfoProps } from '../types'
+import { AppInfoProps } from '../interfaces/appInfo'
 import { convertUnixToVoteDate } from '../utils/dates'
 
 export const AppInfo = ({ algorand, appId, setUserMsg }: AppInfoProps) => {
@@ -11,7 +11,6 @@ export const AppInfo = ({ algorand, appId, setUserMsg }: AppInfoProps) => {
     pollStartDate: string
     pollEndDate: string
   } | null>(null)
-  const [error, setError] = useState<string | null>(null)
 
   const fetchAppDetails = useCallback(async () => {
     if (!appId) return
@@ -19,7 +18,6 @@ export const AppInfo = ({ algorand, appId, setUserMsg }: AppInfoProps) => {
     try {
       const appClient = await algorand.app.getById(appId)
       if (!appClient) {
-        setError(`App with ID ${appId.toString()} not found.`)
         setUserMsg({
           msg: `App with ID ${appId.toString()} not found.`,
           style: 'text-red-700 font-bold',
@@ -48,7 +46,6 @@ export const AppInfo = ({ algorand, appId, setUserMsg }: AppInfoProps) => {
         style: 'text-green-700 font-bold',
       })
     } catch (error) {
-      setError(`Failed to fetch app details for ID ${appId.toString()}.`)
       setUserMsg({
         msg: `Failed to fetch app details for ID ${appId.toString()}.`,
         style: 'text-red-700 font-bold',
@@ -60,10 +57,6 @@ export const AppInfo = ({ algorand, appId, setUserMsg }: AppInfoProps) => {
   useEffect(() => {
     if (appId) fetchAppDetails()
   }, [appId, fetchAppDetails])
-
-  if (error) {
-    return <div className="text-center text-red-700 font-bold mt-4">{error}</div>
-  }
 
   if (!appDetails) {
     return null // Avoid rendering if no app details are available

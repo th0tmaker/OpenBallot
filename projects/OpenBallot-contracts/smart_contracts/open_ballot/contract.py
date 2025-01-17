@@ -10,8 +10,6 @@ from algopy import (
     Txn,
     UInt64,
     arc4,
-    gtxn,
-    itxn,
     log,
     subroutine,
 )
@@ -53,24 +51,28 @@ class OpenBallot(ARC4Contract):
     # Define subroutine that calculates the minimum balance requirement total cost
     @subroutine
     def calc_mbr(self, num_bytes: UInt64, num_uint: UInt64) -> UInt64:
-        base_fee = UInt64(100_000)  # Base fee
-        byte_fee = UInt64(50_000)  # Byte slice fee for key-value pair
-        uint_fee = UInt64(28_500)  # UInt64 fee for key-value pair
+        base_fee = UInt64(100_000)  # Base fee (100_000 * (1 + ExtraProgramPages (if Global base fee)))
+        byte_fee = UInt64(50_000)  # Byte slice fee for key-value pair (25_000 + 25_000)
+        uint_fee = UInt64(28_500)  # UInt64 fee for key-value pair (25_000 + 3_500)
 
         # Multiply respective fee cost with the number of key-value pairs in each schema to get total fee amount
         total_byte_fee = byte_fee * num_bytes
         total_uint_fee = uint_fee * num_uint
 
         # Return the minimum balance requirement total cost
-        return Global.min_balance + base_fee + total_byte_fee + total_uint_fee
+        return base_fee + total_byte_fee + total_uint_fee
 
-    # Define abimethod that creates the smart contract App
+    # Define arc4.abimethod that generates the smart contract client
     @arc4.abimethod(create="require")
     def generate(self) -> None:
         # Make necessary assertions to verify transaction requirements
         assert (
             Txn.sender == Global.creator_address
         ), "Transaction sender must match creator address."
+
+        assert Global.creator_address.balance >= (
+            Global.min_balance + self.calc_mbr(num_bytes=UInt64(4), num_uint=UInt64(8))  # Global schema MBR: 0.528 ALGO
+        ), "Creator address balance must be equal or greater than Global.min_balance + Global schema MBR amount."
 
         # Global storage variable value assignments
         self.total_accounts_opted_in = UInt64(0)
@@ -83,44 +85,27 @@ class OpenBallot(ARC4Contract):
         self.total_votes = UInt64(0)
 
         # Log info on-chain
-        arc4.emit("View(uint64)", Global.current_application_id.id)
         log(
-            "Generation method successful for App ID: ",
-            Global.current_application_id.id,
+            "Global State MBR has been successfully satisfied by account address: ",
+            Txn.sender,
         )
 
-    # Define abimethod that allows the creator to use global storage by paying a MBR cost
-    @arc4.abimethod()
-    def global_storage_mbr(self, mbr_pay: gtxn.PaymentTransaction) -> None:
-        # Make necessary assertions to verify transaction requirements
-        assert mbr_pay.amount == self.calc_mbr(
-            num_bytes=UInt64(4), num_uint=UInt64(8)  # Calc MBR for using global schema
-        ), "MBR payment must meet the minimum requirement amount."
-        assert (
-            mbr_pay.sender == Global.creator_address
-        ), "MBR payment sender must match the App creator account."
-        assert (
-            mbr_pay.receiver == Global.current_application_address
-        ), "MBR payment reciever must be the App address."
+        # Testing log() via 'event emitting'
+        # arc4.emit("View(uint64)", Global.current_application_id.id)
+        # log(
+        #     "Generation method successful for App ID: ",
+        #     Global.current_application_id.id,
+        # )
 
-        # Log info on-chain
-        log("Global State successfully funded by account address: ", Txn.sender)
-
-    # Define abimethod that allows any user to opt in to the smart contract's local storage by paying a MBR cost
+    # Define arc4.abimethod that allows any eligible account to opt in to the smart contract's local storage
     @arc4.abimethod(allow_actions=["OptIn"])
-    def local_storage_mbr(
-        self, account: Account, mbr_pay: gtxn.PaymentTransaction
-    ) -> None:
+    def local_storage(self, account: Account) -> None:
         # Make necessary assertions to verify transaction requirements
-        assert mbr_pay.amount == self.calc_mbr(
-            num_bytes=UInt64(0), num_uint=UInt64(2)  # Calc MBR for using local schema
-        ), "MBR payment must meet the minimum requirement amount."
-        assert (
-            mbr_pay.sender == account
-        ), "MBR payment sender must match the account opting in."
-        assert (
-            mbr_pay.receiver == Global.current_application_address
-        ), "MBR payment reciever must be the App address."
+        assert Txn.sender == account, "Transaction sender must match account address."
+
+        assert account.balance >= (
+            Global.min_balance + self.calc_mbr(num_bytes=UInt64(0), num_uint=UInt64(2))  # Local schema MBR: 0.157 ALGO
+        ), "Account address balance must be equal or greater than Global.min_balance + Local schema MBR amount."
 
         # Change local state var 'self.local_vote_status' (specific to account) value from 'None' to '0'
         self.local_vote_status[account] = UInt64(0)
@@ -132,9 +117,12 @@ class OpenBallot(ARC4Contract):
         self.total_accounts_opted_in += UInt64(1)
 
         # Log info on-chain
-        log("Local State successfully funded by account address: ", Txn.sender)
+        log(
+            "Local State MBR has been successfully satisfied by account address: ",
+            Txn.sender,
+        )
 
-    # Define abimethod that allows any user to opt out of the smart contract's local storage via the 'close out' method
+    # Define arc4.abimethod that allows any eligible account to opt out of the smart contract's local storage
     @arc4.abimethod(allow_actions=["CloseOut"])
     def opt_out(self, account: Account) -> None:
         # Make necessary assertions to verify transaction requirements
@@ -142,27 +130,17 @@ class OpenBallot(ARC4Contract):
             Application(Global.current_application_id.id)
         ), "Account must first be opted-in to App client in order to close out."
 
-        # Delete the user's local storage
+        # Delete account local storage keys and their corresponding values
         del self.local_vote_status[account]
         del self.local_vote_choice[account]
 
-        # Decrease the total count of opted-in accounts
+        # Decrement the total count of accounts that are opted in
         self.total_accounts_opted_in -= UInt64(1)
-
-        # Submit inner transaction (account gets their mbr payment refunded)
-        min_txn_fee = UInt64(1000)
-        itxn.Payment(
-            receiver=account,
-            amount=self.calc_mbr(num_bytes=UInt64(0), num_uint=UInt64(2)) - min_txn_fee,
-            sender=Global.current_application_address,
-            fee=min_txn_fee,
-            note="MBR refund for closing out.",
-        ).submit()
 
         # Log info on-chain
         log("Close-out method successful for account address: ", account)
 
-    # Define abimethod that allows the creator to set up the poll values
+    # Define arc4.abimethod that allows the creator of the smart contract to set the poll data values
     @arc4.abimethod()
     def set_poll(
         self,
@@ -211,7 +189,7 @@ class OpenBallot(ARC4Contract):
 
         assert self.poll_finalized == UInt64(0), "Poll can only be setup once."
 
-        # Update global schema values
+        # Update global state keys with new values
         self.poll_title = title
         self.poll_choice1 = choice1
         self.poll_choice2 = choice2
@@ -219,13 +197,14 @@ class OpenBallot(ARC4Contract):
         self.poll_start_date_unix = start_date_unix
         self.poll_end_date_unix = end_date_unix
 
-        self.poll_finalized = UInt64(1)  # finalize poll
+        # Finalize poll (ensures poll can only be set once)
+        self.poll_finalized = UInt64(1)
 
         # Log info on-chain
         log("Poll start date: ", start_date_str)
         log("Poll end date: ", end_date_str)
 
-    # Define abimethod that allows any user to submit their vote
+    # Define arc4.abimethod that allows any eligible account to submit their vote
     @arc4.abimethod
     def submit_vote(self, account: Account, choice: UInt64) -> None:
         # Make necessary assertions to verify transaction requirements
@@ -270,23 +249,13 @@ class OpenBallot(ARC4Contract):
         log("Vote submitted successfully for account address: ", account)
         log("Vote submitted for choice number: ", choice)
 
-    # Define abimethod that allows the creator to delete App and get their global schema MBR cost refunded
+    # Define arc4.abimethod that allows the creator of the smart contract to delete its client
     @arc4.abimethod(allow_actions=["DeleteApplication"])
     def terminate(self) -> None:
         # Make necessary assertions to verify transaction requirements
         assert (
             Txn.sender == Global.creator_address
         ), "Only App creator can terminate the App."
-
-        # Submit inner transaction (creator gets their mbr payment refunded)
-        min_txn_fee = UInt64(1000)
-        itxn.Payment(
-            receiver=Global.creator_address,
-            amount=self.calc_mbr(num_bytes=UInt64(4), num_uint=UInt64(8)) - min_txn_fee,
-            sender=Global.current_application_address,
-            fee=min_txn_fee,
-            note="MBR refund for deleting App.",
-        ).submit()
 
         # Log info on-chain
         log(

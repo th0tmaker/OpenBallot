@@ -33,15 +33,14 @@ const ConnectWallet = ({ openModal, closeModal }: ConnectWalletInterface) => {
             </>
           )}
 
+          {activeAddress && <p className="text-center text-green-700 font-bold">Wallet connected!</p>}
           {!activeAddress &&
             providers?.map((provider) => (
               <button
                 data-test-id={`${provider.metadata.id}-connect`}
                 className="btn text-black hover:text-white hover:bg-green-700 border-teal-800 border-1 m-2"
                 key={`provider-${provider.metadata.id}`}
-                onClick={() => {
-                  return provider.connect()
-                }}
+                onClick={() => provider.connect()}
               >
                 {!isKmd(provider) && (
                   <img
@@ -54,7 +53,6 @@ const ConnectWallet = ({ openModal, closeModal }: ConnectWalletInterface) => {
               </button>
             ))}
         </div>
-
         <div className="modal-action ">
           <button
             data-test-id="close-wallet-modal"

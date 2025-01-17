@@ -1,10 +1,12 @@
-//./components/JoinApp.tsx
+//./components/ClearState.tsx
+
 import { consoleLogger } from '@algorandfoundation/algokit-utils/types/logging'
 import { useWallet } from '@txnlab/use-wallet'
 import { useState } from 'react'
 import { AppModalInterface } from '../interfaces/appModal'
 
-const JoinAppModal = ({ algorand, openModal, closeModal, onModalExe }: AppModalInterface) => {
+// Create modal called 'Clear State' for clearing user account local storage from existing app client without fail
+const ClearStateModal = ({ algorand, openModal, closeModal, onModalExe }: AppModalInterface) => {
   const { activeAddress } = useWallet() // Get connected wallet active address
   const [userInputAppId, setUserInputAppId] = useState<string>('') // Store user inputed App ID as str
   const [userMsg, setUserMsg] = useState<string | null>(null) // Define hook for displaying messages to the user
@@ -13,14 +15,23 @@ const JoinAppModal = ({ algorand, openModal, closeModal, onModalExe }: AppModalI
   const validateUserInputAppId = async () => {
     const appId = BigInt(userInputAppId) // Cast user input App ID into `BigInt` type
 
+    if (!activeAddress) {
+      throw new Error('Active address not found!')
+    }
+
     try {
-      const app = await algorand.app.getById(appId) // Check if App client with given App ID exists
+      const accountAppInfo = await algorand.client.algod.accountApplicationInformation(activeAddress, Number(appId)).do()
 
-      if (!app) return // Return if app not found
+      // Check if the account has an app-local-state
+      const accountLocalState = accountAppInfo['app-local-state']
+      if (!accountLocalState) {
+        setUserMsg(`Clear State failed! Account not opted in to client with App ID: ${appId}.`)
+        return // Return if account not opted in to app client
+      }
 
-      // If app found
+      // If account opted in to app client
       onModalExe(appId) // pass App ID as the modal on-execute arg
-      // setUserMsg(null) // Clear user message field
+      setUserMsg(null) // Clear user message field
     } catch (error) {
       consoleLogger.error('Error getting App ID:', error)
       setUserMsg('Client not found. Please ensure App ID is valid.')
@@ -28,10 +39,10 @@ const JoinAppModal = ({ algorand, openModal, closeModal, onModalExe }: AppModalI
   }
 
   return (
-    <dialog id="join_app_modal" className={`modal ${openModal ? 'modal-open' : ''}`}>
+    <dialog id="clear_state_modal" className={`modal ${openModal ? 'modal-open' : ''}`}>
       <form method="dialog" className="modal-box">
-        <h3 className="text-2xl font-bold">Join Existing App Client</h3>
-        <p className="mt-4 -mb-2">Provide App ID to join an existing poll and vote.</p>
+        <h3 className="text-2xl font-bold">Clear Local Storage From App Client</h3>
+        <p className="mt-4 -mb-2">Provide App ID to clear local storage from an existing client.</p>
         <div className="grid m-2 pt-5">
           {activeAddress ? (
             <div className="flex flex-col gap-4">
@@ -43,7 +54,7 @@ const JoinAppModal = ({ algorand, openModal, closeModal, onModalExe }: AppModalI
                 className="input input-bordered"
               />
               <button type="button" className="btn text-black hover:text-white hover:bg-green-700" onClick={validateUserInputAppId}>
-                Join
+                Clear
               </button>
               {userMsg && <p className="text-red-700 font-bold">{userMsg}</p>}
             </div>
@@ -67,4 +78,4 @@ const JoinAppModal = ({ algorand, openModal, closeModal, onModalExe }: AppModalI
   )
 }
 
-export default JoinAppModal
+export default ClearStateModal

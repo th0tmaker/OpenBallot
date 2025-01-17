@@ -1,196 +1,132 @@
 //src/methods.ts
 
-import { AlgorandClient, algo } from '@algorandfoundation/algokit-utils'
-import { OpenBallotFactory } from './contracts/OpenBallot'
+import { AlgorandClient } from '@algorandfoundation/algokit-utils'
+import { OpenBallotClient, OpenBallotFactory } from './contracts/OpenBallot'
 
-// Use Algorand client to get typed factory object which will be used to create or deploy the desired smart contract App
-export function getFactory(algorand: AlgorandClient, creator: string) {
-  // Pass your AppFactory object w/ creator as the default sender and signer
-  const factory = algorand.client.getTypedAppFactory(OpenBallotFactory, {
-    defaultSender: creator,
-    defaultSigner: algorand.account.getSigner(creator),
-  })
+// Description
+;`The 'OpenBallotMethods' class serves as a wrapper designed to manage the OpenBallot smart contract methods.
+It uses the AlgorandClient to access '.getTypedAppFactory' in order to retrieve a factory
+object that can generate an instance of the OpenBallot smart contract client. After a client
+is created through factory, the smart contract client will have access to is underyling methods.`
 
-  // Return the created factory object
-  return factory
-}
+// Define and export class that acts as a wrapper for the OpenBallot smart contract methods
+export class OpenBallotMethods {
+  // Declare immutable, private fields for the Algorand client and the OpenBallot factory.
+  private readonly algorand: AlgorandClient
+  private readonly factory: OpenBallotFactory
 
-// Use Factory to send a 'create' abimethod transaction which will generate a new instance of the smart contract App client
-export async function createApp(algorand: AlgorandClient, creator: string) {
-  const factory = algorand.client.getTypedAppFactory(OpenBallotFactory)
+  constructor(algorand: AlgorandClient) {
+    this.algorand = algorand // `AlgorandClient` provides utility methods to interact with the blockchain
+    // `getTypedAppFactory` returns a factory object to manage apps of a specific type (OpenBallot in this case)
+    this.factory = algorand.client.getTypedAppFactory(OpenBallotFactory) // Pass the `OpenBallotFactory` as arg
+  }
 
-  // Generate new App client via factory
-  const { appClient } = await factory.send.create.generate({
-    sender: creator,
-    signer: algorand.account.getSigner(creator),
-    args: [], // No args for create.generate() required
-  })
+  // Get client instance of type `OpenBallotClient` by passing desired app client ID
+  private getAppClient(appId: bigint): OpenBallotClient {
+    return this.factory.getAppClientById({ appId })
+  }
 
-  // Return the App client for further interactions
-  return appClient
-}
+  // Get signer of type `TransactionSigner` by passing desired account address
+  private getSigner(account: string) {
+    return this.algorand.account.getSigner(account)
+  }
 
-// App creator pays MBR cost for global state usage
-export async function payGlobalMbrCost(alogrand: AlgorandClient, creator: string, appId: bigint) {
-  // Get App Factory
-  const factory = alogrand.client.getTypedAppFactory(OpenBallotFactory)
+  // Create a new instance of the OpenBallot smart contract by calling generate()void ABI method
+  async createApp(creator: string) {
+    const { appClient } = await this.factory.send.create.generate({
+      sender: creator,
+      signer: this.getSigner(creator),
+      args: [],
+    })
+    return appClient
+  }
 
-  // Get App client through factory by passing client App ID
-  const client = factory.getAppClientById({ appId })
+  // Deploy a new instance of the OpenBallot smart contract idempotently
+  async deployApp() {
+    const { appClient } = await this.factory.deploy()
 
-  // Create Global Schema MBR payment transaction
-  const mbrPay = await alogrand.createTransaction.payment({
-    sender: creator,
-    receiver: client.appAddress,
-    amount: algo(0.1 + 0.1 + 0.428),
-    extraFee: algo(0.001),
-  })
+    return appClient
+  }
 
-  // Call the client 'global_storage_mbr' abimethod w/ creator as sender and signer
-  await client.send.globalStorageMbr({
-    sender: creator,
-    signer: alogrand.account.getSigner(creator),
-    args: {
-      mbrPay: mbrPay, // pass the MBR payment transaction
-    },
-  })
-}
+  // Get app client by ID and opt in to its local storage
+  async optIn(sender: string, appId: bigint) {
+    const client = this.getAppClient(appId)
+    await client.send.optIn.localStorage({
+      sender,
+      signer: this.getSigner(sender),
+      args: { account: sender },
+    })
+  }
 
-// User opts in to local storage and pays MBR cost
-export async function optIn(algorand: AlgorandClient, sender: string, appId: bigint) {
-  // Get App Factory
-  const factory = algorand.client.getTypedAppFactory(OpenBallotFactory)
+  // Get app client by ID and opt out of its local storage
+  async optOut(sender: string, appId: bigint) {
+    const client = this.getAppClient(appId)
+    await client.send.closeOut.optOut({
+      sender,
+      signer: this.getSigner(sender),
+      args: { account: sender },
+    })
+  }
 
-  // Get App client through factory by passing client App ID
-  const client = factory.getAppClientById({ appId })
+  // Get app client by ID and set its poll properites (can only be done by app creator)
+  async setPoll(
+    creator: string,
+    appId: bigint,
+    title: string,
+    choice1: string,
+    choice2: string,
+    choice3: string,
+    startDateStr: string,
+    startDateUnix: bigint,
+    endDateStr: string,
+    endDateUnix: bigint,
+  ) {
+    const client = this.getAppClient(appId)
+    await client.send.setPoll({
+      sender: creator,
+      signer: this.getSigner(creator),
+      args: {
+        title: new TextEncoder().encode(title),
+        choice1: new TextEncoder().encode(choice1),
+        choice2: new TextEncoder().encode(choice2),
+        choice3: new TextEncoder().encode(choice3),
+        startDateStr,
+        startDateUnix,
+        endDateStr,
+        endDateUnix,
+      },
+    })
+  }
 
-  // Create Local Schema MBR payment transaction
-  const mbrPay = await algorand.createTransaction.payment({
-    sender: sender,
-    receiver: client.appAddress,
-    amount: algo(0.1 + 0.1 + 0.057),
-    extraFee: algo(0.001),
-  })
+  // Get app client by ID and submit a vote with desired choice
+  async submitVote(sender: string, appId: bigint, choice: bigint) {
+    const client = this.getAppClient(appId)
+    await client.send.submitVote({
+      sender,
+      signer: this.getSigner(sender),
+      args: {
+        account: sender,
+        choice,
+      },
+    })
+  }
 
-  // Call the client 'local_storage_mbr' abimethod w/ user as sender and signer
-  await client.send.optIn.localStorageMbr({
-    sender: sender,
-    signer: algorand.account.getSigner(sender),
-    args: {
-      account: sender, // sender is the account opting in
-      mbrPay: mbrPay, // pass the MBR payment transaction
-    },
-  })
-}
+  // Get app client by ID and delete it (can only be done by app creator)
+  async deleteApp(creator: string, appId: bigint) {
+    const client = this.getAppClient(appId)
+    await client.appClient.send.delete({
+      sender: creator,
+      signer: this.getSigner(creator),
+      method: 'terminate',
+    })
+  }
 
-// User opts out of local storage and gets MBR cost refunded
-export async function optOut(algorand: AlgorandClient, sender: string, appId: bigint) {
-  // Get App Factory
-  const factory = algorand.client.getTypedAppFactory(OpenBallotFactory)
-
-  // Get App client through factory by passing client App ID
-  const client = factory.getAppClientById({ appId })
-
-  // Call the client 'out_out' close out abimethod w/ user as sender and signer
-  await client.send.closeOut.optOut({
-    sender: sender,
-    signer: algorand.account.getSigner(sender),
-    args: {
-      account: sender, // sender is the account opting out
-    },
-  })
-}
-
-// Creator sets up poll
-export async function setupPoll(
-  algorand: AlgorandClient,
-  creator: string,
-  appId: bigint,
-  title: string,
-  choice1: string,
-  choice2: string,
-  choice3: string,
-  startDateStr: string,
-  startDateUnix: bigint,
-  endDateStr: string,
-  endDateUnix: bigint,
-) {
-  // Get App Factory
-  const factory = algorand.client.getTypedAppFactory(OpenBallotFactory)
-
-  // Get App client through factory by passing client App ID
-  const client = factory.getAppClientById({ appId })
-
-  // Call the client 'set_vote_dates' abimethod w/ creator as sender and signer
-  await client.send.setupPoll({
-    sender: creator,
-    signer: algorand.account.getSigner(creator),
-    args: {
-      title: new TextEncoder().encode(title),
-      choice1: new TextEncoder().encode(choice1),
-      choice2: new TextEncoder().encode(choice2),
-      choice3: new TextEncoder().encode(choice3),
-      startDateStr: startDateStr,
-      startDateUnix: startDateUnix,
-      endDateStr: endDateStr,
-      endDateUnix: endDateUnix,
-    },
-  })
-}
-
-// User submits vote
-export async function submitVote(algorand: AlgorandClient, sender: string, appId: bigint, choice: bigint) {
-  // Get App Factory
-  const factory = algorand.client.getTypedAppFactory(OpenBallotFactory)
-
-  // Get App client through factory by passing client App ID
-  const client = factory.getAppClientById({ appId })
-
-  // Call the client 'submit_vote' abimethod w/ user as sender and signer
-  await client.send.submitVote({
-    sender: sender,
-    signer: algorand.account.getSigner(sender),
-    args: {
-      account: sender, // sender is the account submitting the vote
-      choice: choice, // choice is passed as arg on call
-    },
-  })
-}
-
-// Creator deletes the smart contract App instance
-export async function deleteApp(algorand: AlgorandClient, creator: string, appId: bigint) {
-  // Get App Factory
-  const factory = algorand.client.getTypedAppFactory(OpenBallotFactory)
-
-  // Get App client through factory by passing client App ID
-  const client = factory.getAppClientById({ appId })
-
-  // await client.send.clearState({
-  //   sender: creator,
-  //   signer: algorand.account.getSigner(creator),
-  //   // Optional parameters if needed:
-  //   // note: new Uint8Array([...]),
-  //   // maxFee: microAlgos(2000),
-  // })
-
-  // Call the client delete application abimethod w/ creator as sender and signer
-  await client.appClient.send.delete({
-    sender: creator,
-    signer: algorand.account.getSigner(creator),
-    method: 'terminate',
-  })
-}
-
-// Clear State
-export async function clearState(algorand: AlgorandClient, sender: string, appId: bigint) {
-  // Get App Factory
-  const factory = algorand.client.getTypedAppFactory(OpenBallotFactory)
-
-  // Get App client through factory by passing client App ID
-  const client = factory.getAppClientById({ appId })
-
-  await client.send.clearState({
-    sender: sender,
-    signer: algorand.account.getSigner(sender),
-  })
+  // Get app client by ID and call the clear state method
+  async clearState(sender: string, appId: bigint) {
+    const client = this.getAppClient(appId)
+    await client.send.clearState({
+      sender, // sender account clears the local schema mbr from their account min balance without fail
+      signer: this.getSigner(sender),
+    })
+  }
 }
