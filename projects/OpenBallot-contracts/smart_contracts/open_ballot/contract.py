@@ -6,11 +6,10 @@ from algopy import (
     Bytes,
     Global,
     LocalState,
-    String,
+    TemplateVar,
     Txn,
     UInt64,
     arc4,
-    log,
     subroutine,
 )
 
@@ -84,18 +83,13 @@ class OpenBallot(ARC4Contract):
         self.choice3_total = UInt64(0)
         self.total_votes = UInt64(0)
 
-        # Log info on-chain
-        log(
-            "Global State MBR has been successfully satisfied by account address: ",
-            Txn.sender,
-        )
-
         # Testing log() via 'event emitting'
         # arc4.emit("View(uint64)", Global.current_application_id.id)
         # log(
         #     "Generation method successful for App ID: ",
         #     Global.current_application_id.id,
         # )
+
 
     # Define arc4.abimethod that allows any eligible account to opt in to the smart contract's local storage
     @arc4.abimethod(allow_actions=["OptIn"])
@@ -116,11 +110,6 @@ class OpenBallot(ARC4Contract):
         # Increment count for total accounts opted in
         self.total_accounts_opted_in += UInt64(1)
 
-        # Log info on-chain
-        log(
-            "Local State MBR has been successfully satisfied by account address: ",
-            Txn.sender,
-        )
 
     # Define arc4.abimethod that allows any eligible account to opt out of the smart contract's local storage
     @arc4.abimethod(allow_actions=["CloseOut"])
@@ -137,20 +126,16 @@ class OpenBallot(ARC4Contract):
         # Decrement the total count of accounts that are opted in
         self.total_accounts_opted_in -= UInt64(1)
 
-        # Log info on-chain
-        log("Close-out method successful for account address: ", account)
 
     # Define arc4.abimethod that allows the creator of the smart contract to set the poll data values
-    @arc4.abimethod()
+    @arc4.abimethod
     def set_poll(
         self,
         title: Bytes,
         choice1: Bytes,
         choice2: Bytes,
         choice3: Bytes,
-        start_date_str: String,
         start_date_unix: UInt64,
-        end_date_str: String,
         end_date_unix: UInt64,
     ) -> None:
         # Make necessary assertions to verify transaction requirements
@@ -166,14 +151,13 @@ class OpenBallot(ARC4Contract):
             and choice3.length <= UInt64(116)
         ), "Poll choice size cannot exceed 116 bytes of data per key-value."
 
-        # UNCOMMENT WHEN DONE TESTING!
-        # assert (
-        #     vote_start_date_unix >= Global.latest_timestamp
-        # ), "Start date must be not be earlier than current date."
+        assert (
+            start_date_unix >= Global.latest_timestamp
+        ), "Start date must be not be earlier than current date."
 
-        # assert (
-        #     vote_end_date_unix >= Global.latest_timestamp
-        # ), "End date must not be earlier than the current timestamp."
+        assert (
+            end_date_unix >= Global.latest_timestamp
+        ), "End date must not be earlier than the current timestamp."
 
         assert (
             start_date_unix < end_date_unix
@@ -200,10 +184,6 @@ class OpenBallot(ARC4Contract):
         # Finalize poll (ensures poll can only be set once)
         self.poll_finalized = UInt64(1)
 
-        # Log info on-chain
-        log("Poll start date: ", start_date_str)
-        log("Poll end date: ", end_date_str)
-
     # Define arc4.abimethod that allows any eligible account to submit their vote
     @arc4.abimethod
     def submit_vote(self, account: Account, choice: UInt64) -> None:
@@ -213,11 +193,11 @@ class OpenBallot(ARC4Contract):
         ), "Account must be opted-in before voting."
 
         assert (
-            Global.latest_timestamp > self.poll_start_date_unix
+            Global.latest_timestamp >= self.poll_start_date_unix
         ), "Voting period has not started yet."
 
         assert (
-            Global.latest_timestamp < self.poll_end_date_unix
+            Global.latest_timestamp <= self.poll_end_date_unix
         ), "Voting period has ended."
 
         assert self.local_vote_choice[account] == UInt64(
@@ -245,20 +225,13 @@ class OpenBallot(ARC4Contract):
             self.choice3_total += UInt64(1)
             self.local_vote_choice[account] = UInt64(3)
 
-        # Log info on-chain
-        log("Vote submitted successfully for account address: ", account)
-        log("Vote submitted for choice number: ", choice)
 
     # Define arc4.abimethod that allows the creator of the smart contract to delete its client
-    @arc4.abimethod(allow_actions=["DeleteApplication"])
+    @arc4.abimethod(create="disallow", allow_actions=["DeleteApplication"])
     def terminate(self) -> None:
         # Make necessary assertions to verify transaction requirements
         assert (
             Txn.sender == Global.creator_address
         ), "Only App creator can terminate the App."
 
-        # Log info on-chain
-        log(
-            "Termination method successful for App ID: ",
-            Global.current_application_id.id,
-        )
+        # assert TemplateVar[UInt64]("DELETABLE"), "Template variable 'DELETABLE' needs to be specified."

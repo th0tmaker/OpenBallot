@@ -109,7 +109,6 @@ def app_factory(algorand: AlgorandClient, creator: AddressAndSigner,  dummy: Add
 
 # Test case: Creator sets poll data (via default ["NoOp"] using the 'set_poll()' abimethod)
 def test_set_poll(
-    algorand: AlgorandClient,
     app_factory: dict[str, OpenBallotClient],
     ) -> None:
 
@@ -151,10 +150,8 @@ def test_set_poll(
         choice1=choice1,
         choice2=choice2,
         choice3=choice3,
-        start_date_str=start_date_str,
-        start_date_unix=start_date_unix,
-        end_date_str=end_date_str,
-        end_date_unix=end_date_unix,
+        start_date_unix=1737451350,
+        end_date_unix=1738228590,
     )
 
     # Verify transaction was confirmed by the network
@@ -164,7 +161,7 @@ def test_set_poll(
 
     # Log
     logger.info("TEST SET POLL BELOW:")
-    get_txn_logs(algorand, creator_set_poll_txn.tx_id, logger)
+    # get_txn_logs(algorand, creator_set_poll_txn.tx_id, logger) <- uncomment to check log() if one available
 
 
 # Test case: Account opts in to local storage (via ["OptIn"] using the 'opt_in_local_storage()' abimethod)
@@ -208,7 +205,6 @@ def test_account_opt_in(
 
 # Test case: Account submits vote (via default ["NoOp"] using the 'submit_vote()' abimethod)
 def test_submit_vote(
-    algorand: AlgorandClient,
     app_factory: dict[str, OpenBallotClient],
     creator: AddressAndSigner,
     dummy: AddressAndSigner,
@@ -240,8 +236,8 @@ def test_submit_vote(
     log_local_state_info(app_client1, creator.address, logger)
     log_local_state_info(app_client1, dummy.address, logger)
 
-    get_txn_logs(algorand, creator_submit_vote_appclient1_txn.tx_id, logger)
-    get_txn_logs(algorand, dummy_submit_vote_appclient1_txn.tx_id, logger)
+    # get_txn_logs(algorand, creator_submit_vote_appclient1_txn.tx_id, logger)
+    # get_txn_logs(algorand, dummy_submit_vote_appclient1_txn.tx_id, logger)
 
 # Test case: Account opts out of local storage (via ["CloseOut"] using the 'opt_out()' abimethod)
 # def test_account_opt_out(

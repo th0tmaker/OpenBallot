@@ -2,14 +2,7 @@
 
 import { useCallback, useState } from 'react'
 import { UIButton } from '../types'
-
-interface BtnStateFlags {
-  actionLoading: boolean
-  optedIn: boolean
-  voteSubmitted: boolean
-  pollInputsValid: boolean
-  pollOpen: boolean
-}
+import { BtnStateFlags } from '../interfaces/btnState'
 
 // Default state
 const defautlBtnStates: BtnStateFlags = {
@@ -17,7 +10,7 @@ const defautlBtnStates: BtnStateFlags = {
   optedIn: false,
   voteSubmitted: false,
   pollInputsValid: false,
-  pollOpen: false,
+  pollVotingPeriodOpen: false,
 }
 
 // Base button styles
@@ -38,13 +31,13 @@ export const checkBtnState = (type: UIButton, flag: BtnStateFlags): boolean => {
     case 'create':
       return flag.actionLoading || !flag.pollInputsValid
     case 'optIn':
-      return flag.actionLoading || flag.optedIn || !flag.pollOpen
+      return flag.actionLoading || flag.optedIn
     case 'optOut':
-      return flag.actionLoading || !flag.optedIn || !flag.pollOpen
-    case 'submitVote':
-      return flag.actionLoading || !flag.optedIn || flag.voteSubmitted || !flag.pollOpen
+      return flag.actionLoading || !flag.optedIn
     case 'choices':
-      return flag.actionLoading || !flag.optedIn || flag.voteSubmitted || !flag.pollOpen
+      return flag.actionLoading || !flag.optedIn || flag.voteSubmitted || !flag.pollVotingPeriodOpen
+    case 'submitVote':
+      return flag.actionLoading || !flag.optedIn || flag.voteSubmitted || !flag.pollVotingPeriodOpen
     case 'delete':
       return flag.actionLoading
     default:

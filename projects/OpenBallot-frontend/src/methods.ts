@@ -2,23 +2,27 @@
 
 import { AlgorandClient } from '@algorandfoundation/algokit-utils'
 import { OpenBallotClient, OpenBallotFactory } from './contracts/OpenBallot'
+import approvalTeal from '../../OpenBallot-contracts/smart_contracts/artifacts/open_ballot/OpenBallot.approval.teal?raw'
+import clearTeal from '../../OpenBallot-contracts/smart_contracts/artifacts/open_ballot/OpenBallot.clear.teal?raw'
 
 // Description
-;`The 'OpenBallotMethods' class serves as a wrapper designed to manage the OpenBallot smart contract methods.
+;`The 'OpenBallotMethodManager' class serves as a wrapper designed to manage the OpenBallot smart contract methods.
 It uses the AlgorandClient to access '.getTypedAppFactory' in order to retrieve a factory
 object that can generate an instance of the OpenBallot smart contract client. After a client
 is created through factory, the smart contract client will have access to is underyling methods.`
 
 // Define and export class that acts as a wrapper for the OpenBallot smart contract methods
-export class OpenBallotMethods {
+export class OpenBallotMethodManager {
   // Declare immutable, private fields for the Algorand client and the OpenBallot factory.
   private readonly algorand: AlgorandClient
   private readonly factory: OpenBallotFactory
 
-  constructor(algorand: AlgorandClient) {
-    this.algorand = algorand // `AlgorandClient` provides utility methods to interact with the blockchain
-    // `getTypedAppFactory` returns a factory object to manage apps of a specific type (OpenBallot in this case)
-    this.factory = algorand.client.getTypedAppFactory(OpenBallotFactory) // Pass the `OpenBallotFactory` as arg
+  constructor(algorand: AlgorandClient, creator: string) {
+    this.algorand = algorand
+    this.factory = algorand.client.getTypedAppFactory(OpenBallotFactory, {
+      defaultSender: creator,
+      defaultSigner: this.getSigner(creator),
+    })
   }
 
   // Get client instance of type `OpenBallotClient` by passing desired app client ID
@@ -31,19 +35,104 @@ export class OpenBallotMethods {
     return this.algorand.account.getSigner(account)
   }
 
-  // Create a new instance of the OpenBallot smart contract by calling generate()void ABI method
+  // private getApprovalProgramTeal(): string {
+  //   return fs.readFileSync(path.join(BASE_DIR, 'artifacts', 'open_ballot', 'OpenBallot.approval.teal'), 'utf-8')
+  // }
+
+  // private getClearProgramTeal(): string {
+  //   return fs.readFileSync(path.join(BASE_DIR, 'artifacts', 'open_ballot', 'OpenBallot.clear.teal'), 'utf-8')
+  // }
+
+  // Create a new instance of the OpenBallot smart contract by calling generate() ABI method
   async createApp(creator: string) {
     const { appClient } = await this.factory.send.create.generate({
       sender: creator,
       signer: this.getSigner(creator),
       args: [],
     })
+
     return appClient
   }
 
-  // Deploy a new instance of the OpenBallot smart contract idempotently
-  async deployApp() {
-    const { appClient } = await this.factory.deploy()
+  async deployApp(creator: string) {
+    // Fetch the AppLookup using the Algorand appDeployer
+
+    //const test2 = await this.algorand.app.compileTeal()
+    // const test3 = await this.algorand.app.compileTealTemplate()
+
+    // const templateParams = {
+    //   DELETABLE_TEMPLATE_NAME: 1,
+    // }
+
+    // const deploymentMetadata = {
+    //   deletable: true,
+    // }
+
+    // const compiledApprovalProgramTeal = await this.algorand.app.compileTealTemplate(approvalTeal, templateParams, deploymentMetadata)
+
+    // const compiledClearProgramTeal = await this.factory.algorand.app.compileTealTemplate(clearTeal, templateParams, deploymentMetadata)
+
+    // consoleLogger.info(compiledApprovalProgramTeal.teal)
+
+    //AppManager
+
+    // const test = await this.factory.algorand.appDeployer.deploy({
+    //   metadata: {
+    //     name: 'OpenBallot',
+    //     version: '1.0.0',
+    //     deletable: true,
+    //   },
+    //   createParams: {
+    //     sender: creator,
+    //     signer: this.getSigner(creator),
+    //     approvalProgram: compiledApprovalProgramTeal.compiledBase64ToBytes,
+    //     clearStateProgram: compiledClearProgramTeal.compiledBase64ToBytes,
+    //     args: [],
+    //     // onComplete: OnApplicationComplete.NoOpOC,
+    //     // method: 'generate',
+    //   },
+    //   updateParams: {
+    //     sender: creator,
+    //     signer: this.getSigner(creator),
+    //   },
+    //   deleteParams: {
+    //     sender: creator,
+    //     signer: this.getSigner(creator),
+    //   },
+
+    //   onUpdate: 'append',
+    // })
+
+    // Extract the deployed app ID
+    // const appId = test.appId
+    // //test.operationPerformed
+    // const client = this.getAppClient(appId)
+    // consoleLogger.info('Deployed App ID:', test)
+    // const lol = client.appSpec.templateVariables
+
+    const { appClient } = await this.factory.deploy({
+      createParams: {
+        sender: creator,
+        signer: this.getSigner(creator),
+        args: [],
+        method: 'generate',
+      },
+
+      deleteParams: {
+        sender: creator,
+        signer: this.getSigner(creator),
+        args: [],
+        method: 'terminate',
+      },
+
+      onUpdate: 'append',
+      onSchemaBreak: 'append',
+
+      updatable: undefined,
+      deletable: undefined,
+    })
+
+    const tempVars = appClient.appSpec.templateVariables
 
     return appClient
   }
@@ -76,12 +165,11 @@ export class OpenBallotMethods {
     choice1: string,
     choice2: string,
     choice3: string,
-    startDateStr: string,
     startDateUnix: bigint,
-    endDateStr: string,
     endDateUnix: bigint,
   ) {
     const client = this.getAppClient(appId)
+
     await client.send.setPoll({
       sender: creator,
       signer: this.getSigner(creator),
@@ -90,9 +178,7 @@ export class OpenBallotMethods {
         choice1: new TextEncoder().encode(choice1),
         choice2: new TextEncoder().encode(choice2),
         choice3: new TextEncoder().encode(choice3),
-        startDateStr,
         startDateUnix,
-        endDateStr,
         endDateUnix,
       },
     })
