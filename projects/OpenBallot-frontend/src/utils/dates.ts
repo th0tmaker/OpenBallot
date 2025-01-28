@@ -48,6 +48,28 @@ export const validateDates = (startUnix: number, endUnix: number): string => {
   return 'Valid dates!'
 }
 
+// Check for validity of poll title
+export const validateTitle = (title: string): string => {
+  const max_title_bytes = 118
+  const getStrByteSize = (str: string): number => new TextEncoder().encode(str).length
+
+  // Validate title length
+  if (getStrByteSize(title) > max_title_bytes) return 'Invalid title! Title is too long.'
+
+  return 'Valid title!'
+}
+
+// Check for validity of poll choice
+export const validateChoice = (choice: string): string => {
+  const max_choice_bytes = 116
+  const getStrByteSize = (str: string): number => new TextEncoder().encode(str).length
+
+  // Check if the choice exceeds byte limit
+  if (getStrByteSize(choice) > max_choice_bytes) return 'Invalid choice! This choice is too long.'
+
+  return 'Valid choice!'
+}
+
 // Check if voting period is open or closed
 export const checkVotingPeriod = (startUnix: bigint, endUnix: bigint): { open: boolean; msg: string } => {
   const currentUnix = Math.floor(Date.now() / 1000) // Get the current unix timestamp in seconds
@@ -72,4 +94,22 @@ export const setDateInputsVisualAid = (startDate: string, endDate: string): stri
 
   // Validate the Unix timestamps and return the corresponding border class
   return validateDates(startUnix, endUnix) === 'Valid dates!' ? 'border-2 border-green-500' : 'border-2 border-red-500'
+}
+
+export const setTitleInputVisualAid = (title: string): string => {
+  if (!title) {
+    return 'border-2 border-red-500'
+  }
+
+  return validateTitle(title) == 'Valid title!' ? 'border-2 border-green-500' : 'border-2 border-red-500'
+}
+
+export const setChoicesInputVisualAid = (choices: string[]): string[] => {
+  return choices.map((choice) => {
+    // If the choice is empty, return a red border immediately
+    if (choice.trim() === '') {
+      return 'border-2 border-red-500'
+    }
+    return validateChoice(choice) === 'Valid choice!' ? 'border-2 border-green-500' : 'border-2 border-red-500'
+  })
 }

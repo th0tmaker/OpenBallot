@@ -13,6 +13,13 @@ export const processPollInputs = (
   // Don't process Poll inputs if UISection is not equal to 'CREATION'
   if (activeSection !== 'CREATION') return false
 
+  // Encapsulated constants
+  const MAX_TITLE_BYTES = 118
+  const MAX_CHOICE_BYTES = 116
+
+  // Helper function to get a string byte size and return a number
+  const getStrByteSize = (str: string): number => new TextEncoder().encode(str).length
+
   // Extract 'pollInputs' properties
   const { title, choices, startDate, endDate } = pollInputs
 
@@ -22,11 +29,22 @@ export const processPollInputs = (
     return false
   }
 
-  // Validate choices
-  const missingChoice = choices.findIndex((choice) => !choice || choice.trim() === '') + 1
-  if (missingChoice) {
-    setUserMsg({ msg: `Attention! Poll choice #${missingChoice} is missing, please provide one.`, style: 'text-red-700 font-bold' })
+  if (getStrByteSize(title) > MAX_TITLE_BYTES) {
+    setUserMsg({ msg: 'Attention! Poll title too long, please shorten it.', style: 'text-red-700 font-bold' })
     return false
+  }
+
+  // Validate choices
+  for (let i = 0; i < choices.length; i++) {
+    const choice = choices[i]
+    if (!choice || choice.trim() === '') {
+      setUserMsg({ msg: `Attention! Poll choice #${i + 1} is missing, please provide one.`, style: 'text-red-700 font-bold' })
+      return false
+    }
+    if (getStrByteSize(choice) > MAX_CHOICE_BYTES) {
+      setUserMsg({ msg: `Attention! Poll choice #${i + 1} too long, please shorten it.`, style: 'text-red-700 font-bold' })
+      return false
+    }
   }
 
   // Validate poll start date

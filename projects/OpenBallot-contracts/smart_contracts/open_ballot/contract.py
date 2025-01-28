@@ -32,6 +32,7 @@ class OpenBallot(ARC4Contract):
     choice3_total: UInt64
     total_votes: UInt64
 
+    # Initializes the smart contract's local state for vote status and vote choice
     def __init__(self) -> None:
         super().__init__()
         # Local State type declarations
@@ -40,17 +41,16 @@ class OpenBallot(ARC4Contract):
             key="vote_status",
             description="Account vote status ('0' = not voted, '1' = voted)",
         )
-
         self.local_vote_choice = LocalState(
             UInt64,
             key="vote_choice",
             description="Account vote choice (based on UInt64 corresponding w/ choice)",
         )
 
-    # Define subroutine that calculates the minimum balance requirement total cost
+    # Calculates the minimum balance requirement total cost for the smart contract
     @subroutine
     def calc_mbr(self, num_bytes: UInt64, num_uint: UInt64) -> UInt64:
-        base_fee = UInt64(100_000)  # Base fee (100_000 * (1 + ExtraProgramPages (if Global base fee)))
+        base_fee = UInt64(100_000)  # Base fee (100_000 * (1 + ExtraProgramPages))
         byte_fee = UInt64(50_000)  # Byte slice fee for key-value pair (25_000 + 25_000)
         uint_fee = UInt64(28_500)  # UInt64 fee for key-value pair (25_000 + 3_500)
 
@@ -61,7 +61,7 @@ class OpenBallot(ARC4Contract):
         # Return the minimum balance requirement total cost
         return base_fee + total_byte_fee + total_uint_fee
 
-    # Define arc4.abimethod that generates the smart contract client
+    # Creates the smart contract client
     @arc4.abimethod(create="require")
     def generate(self) -> None:
         # Make necessary assertions to verify transaction requirements
@@ -70,65 +70,29 @@ class OpenBallot(ARC4Contract):
         ), "Transaction sender must match creator address."
 
         assert Global.creator_address.balance >= (
-            Global.min_balance + self.calc_mbr(num_bytes=UInt64(4), num_uint=UInt64(8))  # Global schema MBR: 0.528 ALGO
+            Global.min_balance
+            + self.calc_mbr(
+                num_bytes=UInt64(4), num_uint=UInt64(8)
+            )  # Global schema MBR: 0.528 ALGO
         ), "Creator address balance must be equal or greater than Global.min_balance + Global schema MBR amount."
 
         # Global storage variable value assignments
-        self.total_accounts_opted_in = UInt64(0)
-
         self.poll_finalized = UInt64(0)
+
+        self.total_accounts_opted_in = UInt64(0)
 
         self.choice1_total = UInt64(0)
         self.choice2_total = UInt64(0)
         self.choice3_total = UInt64(0)
         self.total_votes = UInt64(0)
 
-        # Testing log() via 'event emitting'
-        # arc4.emit("View(uint64)", Global.current_application_id.id)
-        # log(
-        #     "Generation method successful for App ID: ",
-        #     Global.current_application_id.id,
-        # )
+    # Retrieves the version of the smart contract as a Unix timestamp
+    @arc4.abimethod()
+    def get_version_unix(self) -> UInt64:
+        return TemplateVar[UInt64]("VERSION_UNIX")
 
-
-    # Define arc4.abimethod that allows any eligible account to opt in to the smart contract's local storage
-    @arc4.abimethod(allow_actions=["OptIn"])
-    def local_storage(self, account: Account) -> None:
-        # Make necessary assertions to verify transaction requirements
-        assert Txn.sender == account, "Transaction sender must match account address."
-
-        assert account.balance >= (
-            Global.min_balance + self.calc_mbr(num_bytes=UInt64(0), num_uint=UInt64(2))  # Local schema MBR: 0.157 ALGO
-        ), "Account address balance must be equal or greater than Global.min_balance + Local schema MBR amount."
-
-        # Change local state var 'self.local_vote_status' (specific to account) value from 'None' to '0'
-        self.local_vote_status[account] = UInt64(0)
-
-        # Change local state var 'self.local_vote_choice' (specific to account) value from 'None' to '0'
-        self.local_vote_choice[account] = UInt64(0)
-
-        # Increment count for total accounts opted in
-        self.total_accounts_opted_in += UInt64(1)
-
-
-    # Define arc4.abimethod that allows any eligible account to opt out of the smart contract's local storage
-    @arc4.abimethod(allow_actions=["CloseOut"])
-    def opt_out(self, account: Account) -> None:
-        # Make necessary assertions to verify transaction requirements
-        assert account.is_opted_in(
-            Application(Global.current_application_id.id)
-        ), "Account must first be opted-in to App client in order to close out."
-
-        # Delete account local storage keys and their corresponding values
-        del self.local_vote_status[account]
-        del self.local_vote_choice[account]
-
-        # Decrement the total count of accounts that are opted in
-        self.total_accounts_opted_in -= UInt64(1)
-
-
-    # Define arc4.abimethod that allows the creator of the smart contract to set the poll data values
-    @arc4.abimethod
+    # Allows the creator to set up poll data values including title, choices, and dates
+    @arc4.abimethod()
     def set_poll(
         self,
         title: Bytes,
@@ -184,8 +148,45 @@ class OpenBallot(ARC4Contract):
         # Finalize poll (ensures poll can only be set once)
         self.poll_finalized = UInt64(1)
 
-    # Define arc4.abimethod that allows any eligible account to submit their vote
-    @arc4.abimethod
+    # Allows eligible accounts to opt in to the smart contract's local storage
+    @arc4.abimethod(allow_actions=["OptIn"])
+    def local_storage(self, account: Account) -> None:
+        # Make necessary assertions to verify transaction requirements
+        assert Txn.sender == account, "Transaction sender must match account address."
+
+        assert account.balance >= (
+            Global.min_balance
+            + self.calc_mbr(
+                num_bytes=UInt64(0), num_uint=UInt64(2)
+            )  # Local schema MBR: 0.157 ALGO
+        ), "Account address balance must be equal or greater than Global.min_balance + Local schema MBR amount."
+
+        # Change local state var 'self.local_vote_status' (specific to account) value from 'None' to '0'
+        self.local_vote_status[account] = UInt64(0)
+
+        # Change local state var 'self.local_vote_choice' (specific to account) value from 'None' to '0'
+        self.local_vote_choice[account] = UInt64(0)
+
+        # Increment count for total accounts opted in
+        self.total_accounts_opted_in += UInt64(1)
+
+    # Allows eligible accounts to opt out of the smart contract's local storage
+    @arc4.abimethod(allow_actions=["CloseOut"])
+    def opt_out(self, account: Account) -> None:
+        # Make necessary assertions to verify transaction requirements
+        assert account.is_opted_in(
+            Application(Global.current_application_id.id)
+        ), "Account must first be opted-in to App client in order to close out."
+
+        # Delete account local storage keys and their corresponding values
+        del self.local_vote_status[account]
+        del self.local_vote_choice[account]
+
+        # Decrement the total count of accounts that are opted in
+        self.total_accounts_opted_in -= UInt64(1)
+
+    # Allows an opted-in account to submit a vote during the active voting period
+    @arc4.abimethod()
     def submit_vote(self, account: Account, choice: UInt64) -> None:
         # Make necessary assertions to verify transaction requirements
         assert account.is_opted_in(
@@ -208,25 +209,25 @@ class OpenBallot(ARC4Contract):
             choice == UInt64(1) or choice == UInt64(2) or choice == UInt64(3)
         ), "Invalid choice. Can only choose between choices 1, 2, 3."
 
-        # Mark the account as having voted
-        self.local_vote_status[account] = UInt64(1)
-
-        # Increment count for total votes
-        self.total_votes += UInt64(1)
+        self.local_vote_status[account] = UInt64(
+            1
+        )  # Set account vote status (has voted)
+        self.local_vote_choice[account] = (
+            choice  # Set account vote choice (choice selected)
+        )
 
         # Update vote tally
         if choice == UInt64(1):
             self.choice1_total += UInt64(1)
-            self.local_vote_choice[account] = UInt64(1)
         elif choice == UInt64(2):
             self.choice2_total += UInt64(1)
-            self.local_vote_choice[account] = UInt64(2)
         else:
             self.choice3_total += UInt64(1)
-            self.local_vote_choice[account] = UInt64(3)
 
+        # Increment count for total votes
+        self.total_votes += UInt64(1)
 
-    # Define arc4.abimethod that allows the creator of the smart contract to delete its client
+    # Allows the creator to delete the smart contract client
     @arc4.abimethod(create="disallow", allow_actions=["DeleteApplication"])
     def terminate(self) -> None:
         # Make necessary assertions to verify transaction requirements
@@ -234,4 +235,6 @@ class OpenBallot(ARC4Contract):
             Txn.sender == Global.creator_address
         ), "Only App creator can terminate the App."
 
-        # assert TemplateVar[UInt64]("DELETABLE"), "Template variable 'DELETABLE' needs to be specified."
+        assert TemplateVar[UInt64](
+            "DELETABLE"
+        ), "Template variable 'DELETABLE' needs to be set to 'true' at deploy-time."

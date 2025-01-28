@@ -8,33 +8,15 @@ import { AppBaseInfo } from './components/AppBaseInfo'
 import ClearStateModal from './components/ClearState'
 import ConnectWallet from './components/ConnectWallet'
 import JoinAppModal from './components/JoinApp'
+import * as iInterface from './interfaces/index'
 import { OpenBallotMethodManager } from './methods'
 import { UISectionState } from './types'
 import * as button from './utils/buttons'
 import * as date from './utils/dates'
 import * as pollInputs from './utils/pollInputs'
-import * as iInterface from './interfaces/index'
-import { getAlgodConfigFromViteEnvironment } from './utils/network/getAlgoClientConfigs'
-import approvalTeal from '../../OpenBallot-contracts/smart_contracts/artifacts/open_ballot/OpenBallot.approval.teal?raw'
 
 // Algorand client setup
-const algodConfig = getAlgodConfigFromViteEnvironment()
-// algokit.AlgorandClient.fromEnvironment()
 const algorand = algokit.AlgorandClient.fromEnvironment()
-const algoran2 = algokit.AlgorandClient.fromConfig({ algodConfig })
-// const openBallotMethodManager = new OpenBallotMethodManager(algorand, act)
-
-class Logger {
-  log(message: string) {
-    console.log(message);
-  }
-
-  error(message: string) {
-    console.error(message);
-  }
-}
-
-const logger = new Logger();
 
 const Home: React.FC = () => {
   // Wallet Address & Signer
@@ -85,10 +67,7 @@ const Home: React.FC = () => {
     if (currentPollInputs && activeSection === 'CREATION') {
       // Process poll inputs
       const arePollInputsValid = pollInputs.processPollInputs(currentPollInputs, activeSection, setUserMsg)
-
       updateBtnStates({ pollInputsValid: arePollInputsValid }) // Update the button state accordingly
-
-      // blaBla()
     }
   }, [currentPollInputs, btnStates.pollInputsValid, activeSection, setUserMsg])
 
@@ -196,28 +175,6 @@ const Home: React.FC = () => {
     // Toggle clear state modal between open and not open state
     setOpenClearStateModal((prev) => !prev)
   }
-
-  // const blaBla = async () => {
-
-  //   const tempVars = true
-  //   // Check if templateVariables exist and are accessible
-  //   if (tempVars) {
-  //     // Loop through and print the names and values of the template variables
-  //     for (const [varName, varData] of Object.entries(tempVars)) {
-  //       consoleLogger.info(`Template Variable: ${varName}`)
-  //       consoleLogger.info(`  Type: ${varData.type}`)
-  //       if (varData.value) {
-  //         consoleLogger.info(`  Value: ${varData.value}`)
-  //       } else {
-  //         consoleLogger.info(`  No value set.`)
-  //       }
-  //     }
-  //   } else {
-  //     consoleLogger.info('No template variables found.')
-  //   }
-  // }
-
-
 
   // Join existing App Client by passing the JoinApp modal App ID
   const onJoinApp = async (appId: bigint): Promise<boolean | null> => {
@@ -419,28 +376,10 @@ const Home: React.FC = () => {
     try {
       // Execute smart contract Create method
       consoleLogger.warn('Executing Create method. Generating new App client!')
-      console.log('aa')
-      logger.log('Test message');
-      const appClient = await openBallotMethodManager.createApp(activeAddress)
 
-      // const appClient = await openBallotMethodManager.deployApp(activeAddress)
+      // const appClient = await openBallotMethodManager.createApp(activeAddress)
 
-      const tempVars = appClient.appSpec.templateVariables
-
-      if (tempVars) {
-        // Loop through and print the names and values of the template variables
-        for (const [varName, varData] of Object.entries(tempVars)) {
-          consoleLogger.warn(`Template Variable: ${varName}`)
-          consoleLogger.warn(`  Type: ${varData.type}`)
-          if (varData.value) {
-            consoleLogger.warn(`  Value: ${varData.value}`)
-          } else {
-            consoleLogger.warn(`  No value set.`)
-          }
-        }
-      } else {
-        consoleLogger.warn('No template variables found.')
-      }
+      const appClient = await openBallotMethodManager.deployApp(activeAddress)
 
       consoleLogger.warn('Create method successfull in generating new App client!')
 
@@ -833,20 +772,43 @@ const Home: React.FC = () => {
   // * POLL INPUTS LOGIC *
   // Handle updating poll inputs by html element 'name' reference (title, start date, end date)
   const handlePollInputChangeByName = (e: React.ChangeEvent<HTMLInputElement>): void => {
-    const { name, value } = e.target
+    const { name, value, type } = e.target
 
-    // Ensure value includes seconds
-    const formattedValue = value.length === 16 ? `${value}:00` : value // Default to `:00` if seconds are missing
-    setCurrentPollInputs((prev) => ({ ...prev, [name]: formattedValue }))
+    // Only format datetime-local inputs
+    if (type === 'datetime-local' && value.length === 16) {
+      setCurrentPollInputs((prev) => ({
+        ...prev,
+        [name]: `${value}:00`,
+      }))
+    } else {
+      setCurrentPollInputs((prev) => ({
+        ...prev,
+        [name]: value,
+      }))
+    }
   }
 
   // Handle updating poll inputs for 'array' field (choices)
   const handlePollChoicesArrayChange = (index: number, value: string): void => {
     setCurrentPollInputs((prev) => {
-      const newChoices = [...prev.choices]
-      newChoices[index] = value
-      return { ...prev, choices: newChoices }
+      const updatedChoices = [...prev.choices]
+      updatedChoices[index] = value
+      return { ...prev, choices: updatedChoices }
     })
+  }
+
+  // Break into new line when poll input exceeds a certain amount of characters per line
+  const formatpollInputWithLineBreak = (text: string | undefined, charsPerLine: number): string => {
+    if (!text) return 'No Text Available' // Fallback for undefined or empty text
+
+    let formattedText = ''
+    for (let i = 0; i < text.length; i += charsPerLine) {
+      formattedText += text.slice(i, i + charsPerLine)
+      if (i + charsPerLine < text.length) {
+        formattedText += '<br />'
+      }
+    }
+    return formattedText
   }
 
   return (
@@ -903,9 +865,7 @@ const Home: React.FC = () => {
                         autoComplete="off"
                         value={currentPollInputs.title}
                         onChange={handlePollInputChangeByName}
-                        className={`w-full p-3 border rounded-md focus:outline-none ${
-                          currentPollInputs.title ? 'border-2 border-green-500' : 'border-2 border-red-500'
-                        }`}
+                        className={`w-full p-3 border rounded-md focus:outline-none ${date.setTitleInputVisualAid(currentPollInputs.title)}`} // Apply title visual aid
                         required
                       />
                     </div>
@@ -919,9 +879,7 @@ const Home: React.FC = () => {
                           placeholder={`Choice ${index + 1}`}
                           value={choice}
                           onChange={(e) => handlePollChoicesArrayChange(index, e.target.value)}
-                          className={`w-full p-3 border rounded-md focus:outline-none ${
-                            currentPollInputs.choices[index] ? 'border-2 border-green-500' : 'border-2 border-red-500'
-                          }`}
+                          className={`w-full p-3 border rounded-md focus:outline-none ${date.setChoicesInputVisualAid(currentPollInputs.choices)[index]}`} // Apply individual choice visual aid
                           required
                         />
                       ))}
@@ -986,7 +944,12 @@ const Home: React.FC = () => {
           {activeSection === 'ENGAGEMENT' && (
             // Engagement Section
             <div className="voting-section mt-4 p-6 max-w-4xl bg-white rounded-lg shadow-lg border-2 border-black mx-auto">
-              <h1 className={`text-[36px] font-bold text-center mb-4 underline`}>{currentAppClient?.pollTitle || 'No Title Available'}</h1>
+              <h1
+                className="text-[36px] font-bold text-center mb-4 underline"
+                dangerouslySetInnerHTML={{
+                  __html: formatpollInputWithLineBreak(currentAppClient?.pollTitle ?? '', 40),
+                }}
+              />
               <div className="space-y-2">
                 <p className="text-[20px] -mt-2 font-bold text-gray-800">
                   Is Voting Open :{' '}
@@ -1014,9 +977,13 @@ const Home: React.FC = () => {
                               }}
                               disabled={button.checkBtnState('choices', btnStates)}
                             />
-                            <label htmlFor={`choice-${index}`} className={`text-[20px] font-bold 'text-gray-400' : 'text-black'}`}>
-                              {choice || `Choice ${index + 1}`}
-                            </label>
+                            <label
+                              htmlFor={`choice-${index}`}
+                              className="text-[20px] font-bold"
+                              dangerouslySetInnerHTML={{
+                                __html: formatpollInputWithLineBreak(choice, 80) || `Choice ${index + 1}`,
+                              }}
+                            />
                           </li>
                         ),
                     )}
