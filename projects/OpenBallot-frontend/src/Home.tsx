@@ -51,7 +51,7 @@ const Home: React.FC = () => {
   const [choiceDecision, setChoiceDecision] = useState<bigint | null>(null) // Store user choice decision
   const [choiceDisplay, setChoiceDisplay] = useState<{ index: number | null; text: string }>({ index: null, text: '' }) // Display choice on screen
 
-  const [votingPeriod, setVotingPeriod] = useState({ open: true, msg: 'Yes' }) // Track if poll voting period is over
+  const [votingPeriod, setVotingPeriod] = useState({ open: false, msg: 'No' }) // Track if poll voting period is over
 
   // UI Section Display State
   const [activeSection, setActiveSection] = useState<UISectionState>('HOME') // Set and update the UI diplay sections
@@ -59,7 +59,9 @@ const Home: React.FC = () => {
   // Button State
   const { btnStates, updateBtnStates } = button.setBtnState() // Set and update the state of buttons
 
-  // *EVENT LISTENER (manage lifecycle side-effects)*
+  // ==================================================
+  // * EVENT LISTENER (manage lifecycle side-effects) *
+  // ==================================================
 
   // Checking the validity of user-provided poll inputs
   useEffect(() => {
@@ -88,20 +90,18 @@ const Home: React.FC = () => {
     }
 
     loadGlobalState() // Call method
-  }, [currentAppId, hasLoadedApp]) // Trigger effect re-run based on the values of the variables it contains
+  }, [currentAppId, currentAppClient?.appId, hasLoadedApp]) // Trigger effect re-run based on the values of the variables it contains
 
   // Load App Client Local State
   useEffect(() => {
     const loadLocalState = async () => {
-      // Return and escape if no wallet active address found or App ID is null or account not opted in to 'currentAppClient'
+      // Return and escape if no wallet active address found or App ID is null
       if (!activeAddress || !currentAppClient?.appId) return
 
       try {
         // If wallet connected, proceed with loading App client State
         const localState = await queryLocalState(currentAppClient.appId, activeAddress) // query account Local State on App client
         consoleLogger.info(`Local State for App client with ID: ${currentAppClient.appId.toString()} has been loaded successfully!`)
-
-        consoleLogger.info(String(choiceDecision))
 
         if (localState) {
           const { optedIn, localVoteStatus, localVoteChoice } = localState
@@ -120,7 +120,7 @@ const Home: React.FC = () => {
           const currentVotingPeriod = date.checkVotingPeriod(currentAppClient.pollStartDateUnix, currentAppClient.pollEndDateUnix)
           setVotingPeriod(currentVotingPeriod) // Set 'votingPeriod'
 
-          consoleLogger.info('Voting Status:', votingPeriod)
+          consoleLogger.info('Voting Status:', currentVotingPeriod)
 
           // Update the button states based on the Local State key-value pairs
           updateBtnStates({
@@ -137,7 +137,7 @@ const Home: React.FC = () => {
             isOptedIn: optedIn,
           }
 
-          // Pass 'updatedAppClient' as new 'currentAppCleint'
+          // Pass 'updatedAppClient' as new 'currentAppClient'
           setCurrentAppClient(updatedAppClient)
           consoleLogger.info('LocaL State queried and updated with new values:', updatedAppClient)
         }
@@ -147,9 +147,12 @@ const Home: React.FC = () => {
     }
 
     loadLocalState()
-  }, [activeAddress, currentAppClient?.appId, currentAppClient?.isOptedIn, votingPeriod.open])
+  }, [activeAddress, currentAppClient?.isOptedIn])
 
-  // * MODAL EVENTS*
+  // ================
+  // * MODAL EVENTS *
+  // ================
+
   // Toggle ConnectWallet Modal State
   const toggleWalletModal = () => {
     // Toggle wallet modal between open and not open state
@@ -230,7 +233,10 @@ const Home: React.FC = () => {
     }
   }
 
-  // * ALGORAND CLIENT DATA RETRIEVAL*
+  // ==================================
+  // * ALGORAND CLIENT DATA RETRIEVAL *
+  // ==================================
+
   // Create a memoized callback method that requests Global State information of a smart contract by passing its App ID through the Algorand client
   const queryGlobalState = useCallback(async () => {
     if (!activeAddress) {
@@ -289,9 +295,6 @@ const Home: React.FC = () => {
       // Set new App client state object as 'currentAppClient'
       setCurrentAppClient(newAppClientState)
 
-      // Mark the current App Client as loaded
-      hasLoadedApp.current[currentAppId.toString()] = true
-
       consoleLogger.info(`Global State for App client with ID: ${currentAppId.toString()} has been queried successfully!`)
     } catch (error) {
       consoleLogger.error(`Failed to query Global State for App client with ID: ${currentAppId.toString()}!`)
@@ -337,13 +340,8 @@ const Home: React.FC = () => {
       const accountLocalVoteStatus = Number(accountLocalState['key-value']?.[1]?.['value']?.['uint'])
       const accountLocalVoteChoice = Number(accountLocalState['key-value']?.[0]?.['value']?.['uint'])
 
-      // Console log data
-      // consoleLogger.info('Account is opted in to:', appId.toString())
-      // consoleLogger.info('Checking local vote status:', accountLocalVoteStatus)
-      // consoleLogger.info('Checking local vote choice:', accountLocalVoteChoice)
-
       // Return Local State keys with extracted values
-      return { optedIn: true, localVoteStatus: accountLocalVoteStatus ?? null, localVoteChoice: accountLocalVoteChoice ?? null }
+      return { optedIn: true, localVoteStatus: accountLocalVoteStatus, localVoteChoice: accountLocalVoteChoice }
     } catch (error) {
       consoleLogger.error('Error querying local state:', error)
       consoleLogger.error(`Failed to query Local State for Account Address: ${address} tied to App client with ID: ${appId.toString()}!`)
@@ -354,9 +352,9 @@ const Home: React.FC = () => {
   }
 
   // Create a new OpenBallot smart contract App client
-  const createApp = async () => {
+  const handleAppLaunch = async () => {
     if (!activeAddress) {
-      consoleLogger.error('Broke out onSubmitVoteBtnClick: activeAddress not found!')
+      consoleLogger.error('Broke out handleAppLaunch: activeAddress not found!')
       setUserMsg({
         msg: 'Account address not found! Please check if your wallet is connected.',
         style: 'text-red-700 font-bold',
@@ -375,13 +373,15 @@ const Home: React.FC = () => {
 
     try {
       // Execute smart contract Create method
-      consoleLogger.warn('Executing Create method. Generating new App client!')
+      consoleLogger.info('Executing Create method. Generating new App client!')
 
+      // Uncomment this if you want to create the application straight up with no additional params
       // const appClient = await openBallotMethodManager.createApp(activeAddress)
 
+      // Uncomment this if you want to deploy the application with additional params
       const appClient = await openBallotMethodManager.deployApp(activeAddress)
 
-      consoleLogger.warn('Create method successfull in generating new App client!')
+      consoleLogger.info('Create method successfull in generating new App client!')
 
       // Execute smart contract setPoll method
       consoleLogger.info('Executing Set Poll method. Generating App client poll!')
@@ -410,7 +410,10 @@ const Home: React.FC = () => {
     }
   }
 
-  // * BUTTON LOGIC*
+  // ================
+  // * BUTTON LOGIC *
+  // ================
+
   // Execute when Start button is clicked
   const onStartBtnClick = () => {
     // Prompt user if they press the Start button without connecting their wallet first
@@ -438,7 +441,7 @@ const Home: React.FC = () => {
     })
 
     try {
-      await createApp() // Await createApp() when Create (Poll) button is clicked
+      await handleAppLaunch() // Await handleAppLaunch() when Create (Poll) button is clicked
       setActiveSection('ENGAGEMENT') // Switch UI section to engagement
     } catch (error) {
       consoleLogger.error('Error with Create (Poll) button click!', error)
@@ -727,7 +730,7 @@ const Home: React.FC = () => {
     try {
       // Execute smart contract submitVote method
       consoleLogger.info(`Executing Submit Vote method on client with App ID: ${currentAppClient.appId.toString()}!`)
-      await openBallotMethodManager.submitVote(activeAddress, currentAppClient?.appId, choiceDecision)
+      await openBallotMethodManager.submitVote(activeAddress, currentAppClient.appId, choiceDecision)
       consoleLogger.info(`Submit Vote method successfull on client with App ID: ${currentAppClient.appId.toString()}!`)
       consoleLogger.info(`Submit Vote method successfull for account address: ${activeAddress}`)
 
@@ -744,7 +747,7 @@ const Home: React.FC = () => {
         voteSubmitted: true,
       })
 
-      // Use local values for immediate adjustments
+      // Update currentAppClient with new values
       const updatedAppClient = {
         ...currentAppClient,
         pollVoteStatus: 1,
@@ -769,7 +772,10 @@ const Home: React.FC = () => {
     }
   }
 
+  // =====================
   // * POLL INPUTS LOGIC *
+  // =====================
+
   // Handle updating poll inputs by html element 'name' reference (title, start date, end date)
   const handlePollInputChangeByName = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const { name, value, type } = e.target
@@ -827,13 +833,11 @@ const Home: React.FC = () => {
               <button className={button.setBtnStyle('join')} onClick={toggleJoinAppModal}>
                 Join
               </button>
-
               <JoinAppModal algorand={algorand} openModal={openJoinAppModal} closeModal={toggleJoinAppModal} onModalExe={onJoinApp} />
 
               <button className={button.setBtnStyle('clear')} onClick={toggleClearStateModal}>
                 Clear
               </button>
-
               <ClearStateModal
                 algorand={algorand}
                 openModal={openClearStateModal}
@@ -844,7 +848,6 @@ const Home: React.FC = () => {
               <button className={button.setBtnStyle('wallet')} onClick={toggleWalletModal}>
                 Tekvin
               </button>
-
               <ConnectWallet openModal={openWalletModal} closeModal={toggleWalletModal} />
             </div>
           )}
@@ -865,8 +868,7 @@ const Home: React.FC = () => {
                         autoComplete="off"
                         value={currentPollInputs.title}
                         onChange={handlePollInputChangeByName}
-                        className={`w-full p-3 border rounded-md focus:outline-none ${date.setTitleInputVisualAid(currentPollInputs.title)}`} // Apply title visual aid
-                        required
+                        className={`w-full p-3 border rounded-md focus:outline-none ${date.setTitleInputVisualAid(currentPollInputs.title)}`}
                       />
                     </div>
 
@@ -879,7 +881,7 @@ const Home: React.FC = () => {
                           placeholder={`Choice ${index + 1}`}
                           value={choice}
                           onChange={(e) => handlePollChoicesArrayChange(index, e.target.value)}
-                          className={`w-full p-3 border rounded-md focus:outline-none ${date.setChoicesInputVisualAid(currentPollInputs.choices)[index]}`} // Apply individual choice visual aid
+                          className={`w-full p-3 border rounded-md focus:outline-none ${date.setChoicesInputVisualAid(currentPollInputs.choices)[index]}`}
                           required
                         />
                       ))}
@@ -901,6 +903,7 @@ const Home: React.FC = () => {
                           required
                         />
                       </div>
+
                       <div>
                         <label className="block text-lg font-bold text-gray-700 mb-2">End Date</label>
                         <input
@@ -922,13 +925,13 @@ const Home: React.FC = () => {
                   <div className="flex gap-2 justify-center mt-6 pt-4">
                     <button
                       type="submit"
-                      disabled={button.checkBtnState('create', btnStates)} // Use the state value here
+                      disabled={button.checkBtnState('create', btnStates)}
                       className={`btn w-36 h-14 justify-center rounded-md text-[24px] tracking-wide font-bold m-2 ${
                         btnStates.pollInputsValid
                           ? 'bg-yellow-300 hover:bg-green-500 border-[3px] border-black hover:border-[4px] hover:border-green-700'
                           : 'bg-gray-400 border-[3px] border-gray-600 cursor-not-allowed'
                       }`}
-                      onClick={onCreatePollBtnClick} // Handle button click
+                      onClick={onCreatePollBtnClick}
                     >
                       Create
                     </button>

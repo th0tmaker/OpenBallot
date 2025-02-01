@@ -214,10 +214,10 @@ export class OpenBallotMethodManager {
         sender: creator, // The address of the account authorized to delete the application.
         signer: this.getSigner(creator), // The signer for the creator's transactions.
         args: [], // No args required to initialize the application, but empty array needs to be passed.
-        method: 'terminate', // The ABI method for terminating the application.
+        method: 'terminate', // The ABI method name for terminating the application.
       },
       onUpdate: 'append', // Behavior for updates (e.g., append new data if updates occur).
-      onSchemaBreak: 'fail', // Behavior for schema changes (e.g., fail if incompatible changes occur).
+      // onSchemaBreak: 'fail', // Behavior for schema changes (e.g., fail if incompatible changes occur).
       deployTimeParams: templateParams, // Dynamic parameters for deployment (e.g., `TMPL_VERSION_UNIX`).
       updatable: undefined, // No explicit setting for app updatability.
       deletable: true, // Allows the app to be deleted by the authorized account.
