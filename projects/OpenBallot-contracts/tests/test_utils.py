@@ -236,11 +236,19 @@ def get_txn_logs(algorand: AlgorandClient, tx_id: str, logger: logging.Logger) -
             logged_int = int.from_bytes(base64_log_bytes)
             logger.info(f"Int in logs: {logged_int}")
 
-def read_box_key(algorand: AlgorandClient, app_id: int, box_name: bytes, logger: logging.Logger) -> None:
+
+def read_box_data(
+    algorand: AlgorandClient, app_id: int, box_name: bytes, logger: logging.Logger
+) -> None:
     box = algorand.client.algod.application_box_by_name(app_id, box_name)
     box_title = base64.b64decode(box["name"])
+    box_value = list(base64.b64decode(box["value"]))
+
     if len(box_title[-32:]) == 32:
         addr_base32 = encode_address(box_title[-32:])
-        logger.info(f"Address: {addr_base32} using box with prefix: {box_title[:-32]}")
+        logger.info(
+            f"Address: {addr_base32} using box with key prefix: {box_title[:-32]}"
+        )
 
-
+    logger.info(f"Address: {addr_base32} - VoterData.voted: {box_value[0]}")
+    logger.info(f"Address: {addr_base32} - VoterData.choice: {box_value[1]}")

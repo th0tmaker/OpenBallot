@@ -1,23 +1,25 @@
 # smart_contracts/open_ballot/contract.py
 from algopy import (
     Account,
-    Application,
     ARC4Contract,
+    BoxMap,
     Bytes,
     Global,
-    LocalState,
     TemplateVar,
     Txn,
     UInt64,
     arc4,
-    BoxMap,
-    subroutine,
     gtxn,
-    log,
+    subroutine,
 )
 
-# class User(arc4.Struct):
-#     pass
+
+class VoterData(arc4.Struct):
+    voted: arc4.UInt8  # Description="VoterData.voted ('0' = not voted, '1' = voted)",
+    choice: (
+        arc4.UInt8
+    )  # Description="VoterData.choice (based on arc4.UInt8 value corresponding w/ choice)"
+
 
 class OpenBallot(ARC4Contract):
     # Global State type declarations
@@ -52,12 +54,40 @@ class OpenBallot(ARC4Contract):
         #     description="Account vote choice (based on UInt64 corresponding w/ choice)",
         # )
 
-        self.vote_status_box = BoxMap(Account, UInt64, key_prefix=b"vote_status_")
-        # self.vote_choice = BoxMap(Account, UInt64, key_prefix=b"b_")
+        self.box_a_voter_data = BoxMap(Account, VoterData, key_prefix=b"a_")
 
-    # Calculates the minimum balance requirement total cost for the smart contract
+    # Calculates box fee for single unit
+    @subroutine
+    def calc_single_box_fee(
+        self, key_size: arc4.UInt8, value_size: arc4.UInt8
+    ) -> UInt64:
+
+        # Formula for calculating single box fee
+        base_fee = arc4.UInt16(2_500)  # Base fee (2_500)
+        size_fee = arc4.UInt16(400).native * (
+            key_size.native + value_size.native
+        )  # Size fee (400 per byte * (len(key)+len(value)))
+
+        # Return single box fee
+        return base_fee.native + size_fee
+
+    # Calculates the Box storage minimum balance requirement total cost for the smart contract
+    @subroutine
+    def calc_box_storage_mbr(self) -> UInt64:
+
+        # Calculate Box A fee
+        box_a = self.calc_single_box_fee(
+            arc4.UInt8(34), arc4.UInt8(2)
+        )  # fee: 0.0169 ALGO
+
+        # Return the minimum balance requirement total cost
+        return box_a
+
+    # Calculates the Global and Local schema minimum balance requirement total cost for the smart contract
     @subroutine
     def calc_schema_mbr(self, num_bytes: UInt64, num_uint: UInt64) -> UInt64:
+
+        # Schema individual fees
         base_fee = UInt64(100_000)  # Base fee (100_000 * (1 + ExtraProgramPages))
         byte_fee = UInt64(50_000)  # Byte slice fee for key-value pair (25_000 + 25_000)
         uint_fee = UInt64(28_500)  # UInt64 fee for key-value pair (25_000 + 3_500)
@@ -68,39 +98,6 @@ class OpenBallot(ARC4Contract):
 
         # Return the minimum balance requirement total cost
         return base_fee + total_byte_fee + total_uint_fee
-
-    @subroutine
-    def calc_single_box_fee(self, key_size: arc4.UInt8, value_size: UInt64) -> UInt64:
-        base_fee = arc4.UInt16(2_500)  # Base fee (2_500)
-        size_fee = arc4.UInt16(400).native * (
-            key_size.native + value_size)  # Size fee (400 per byte * (len(key)+len(value)))
-
-        # Return single box fee
-        return base_fee.native + size_fee
-
-    @subroutine
-    def calc_box_mbr(self) -> UInt64:
-        box1 = self.calc_single_box_fee(arc4.UInt8(44), UInt64(8))  # fee: 0.0229 ALGO
-        # box2 = self.calc_single_box_fee(arc4.UInt8(6), UInt64(100))
-
-        return box1
-
-
-    @arc4.abimethod()
-    def pay_box_storage_mbr(self, mbr_pay: gtxn.PaymentTransaction) -> None:
-        # Make necessary assertions to verify transaction requirements
-        assert mbr_pay.amount >= self.calc_box_mbr(), "MBR payment must meet the minimum requirement amount."
-        assert mbr_pay.sender == Txn.sender, "MBR payment sender address must match transaction sender address."
-        assert (
-            mbr_pay.receiver == Global.current_application_address
-        ), "MBR payment reciever address must be the App address."
-
-        status , exists = self.vote_status_box.maybe(Txn.sender)
-
-        if not exists:
-            self.vote_status_box[Txn.sender] = UInt64(666777888)
-
-        log("MBR payment amount: ", mbr_pay.amount)
 
     # Creates the smart contract client
     @arc4.abimethod(create="require")
@@ -126,7 +123,6 @@ class OpenBallot(ARC4Contract):
         self.choice2_total = UInt64(0)
         self.choice3_total = UInt64(0)
         self.total_votes = UInt64(0)
-
 
     # Retrieves the version of the smart contract as a Unix timestamp
     @arc4.abimethod()
@@ -157,13 +153,13 @@ class OpenBallot(ARC4Contract):
             and choice3.length <= UInt64(116)
         ), "Poll choice size cannot exceed 116 bytes of data per key-value."
 
-        assert (
-            start_date_unix >= Global.latest_timestamp
-        ), "Start date must be not be earlier than current date."
+        # assert (
+        #     start_date_unix >= Global.latest_timestamp
+        # ), "Start date must be not be earlier than current date."
 
-        assert (
-            end_date_unix >= Global.latest_timestamp
-        ), "End date must not be earlier than the current timestamp."
+        # assert (
+        #     end_date_unix >= Global.latest_timestamp
+        # ), "End date must not be earlier than the current timestamp."
 
         assert (
             start_date_unix < end_date_unix
@@ -189,6 +185,64 @@ class OpenBallot(ARC4Contract):
 
         # Finalize poll (ensures poll can only be set once)
         self.poll_finalized = UInt64(1)
+
+    # Request the use of box storage by making a payment to the App address that covers the MBR cost per box
+    @arc4.abimethod()
+    def fund_box_storage_mbr(self, mbr_pay: gtxn.PaymentTransaction) -> None:
+        # Make necessary assertions to verify transaction requirements
+        assert (
+            Txn.sender == Global.creator_address
+        ), "Transaction sender must match creator address."
+
+        assert (
+            mbr_pay.sender == Global.creator_address
+        ), "MBR payment sender address must match the App creator address."
+
+        assert (
+            mbr_pay.receiver == Global.current_application_address
+        ), "MBR payment reciever address must match the App address."
+
+        assert (
+            mbr_pay.amount
+            >= self.calc_box_storage_mbr()  # Box Storage MBR: 0.0169 ALGO
+        ), "MBR payment must meet the minimum requirement amount."
+
+        assert Global.current_application_address.balance >= (
+            Global.min_balance + self.calc_box_storage_mbr()
+        ), "App address balance must be equal or greater than Global.min_balance + Box Storage MBR amount."
+
+        # Check if voter data box doesn't already exist, if not (False) then create new one
+        # if not self.box_a_voter_data.maybe(Txn.sender)[1]: <- This works too if copy() used
+        if Global.creator_address not in self.box_a_voter_data:
+            self.box_a_voter_data[Global.creator_address] = VoterData(
+                arc4.UInt8(0), arc4.UInt8(0)
+            )
+
+    # Request the use of box(es) by making a payment to the App address that covers the fee
+    @arc4.abimethod()
+    def request_box(self, box_pay: gtxn.PaymentTransaction) -> None:
+        # Make necessary assertions to verify transaction requirements
+        assert (
+            Txn.sender not in self.box_a_voter_data
+        ), "Transaction sender must match creator address."
+
+        assert (
+            box_pay.sender not in self.box_a_voter_data
+        ), "Box payment sender address must match the App creator address."
+
+        assert (
+            box_pay.receiver == Global.current_application_address
+        ), "MBR payment reciever address must match the App address."
+
+        assert (
+            box_pay.amount
+            >= self.calc_box_storage_mbr()  # Box Storage MBR: 0.0169 ALGO
+        ), "MBR payment must meet the minimum requirement amount."
+
+        # Check if voter data box doesn't already exist, if not (False) then create new one
+        # if not self.box_a_voter_data.maybe(Txn.sender)[1]: <- This works too if copy() used
+        if Txn.sender not in self.box_a_voter_data:
+            self.box_a_voter_data[Txn.sender] = VoterData(arc4.UInt8(0), arc4.UInt8(0))
 
     # Allows eligible accounts to opt in to the smart contract's local storage
     # @arc4.abimethod(allow_actions=["OptIn"])
@@ -228,53 +282,57 @@ class OpenBallot(ARC4Contract):
     #     self.total_accounts_opted_in -= UInt64(1)
 
     # Allows an opted-in account to submit a vote during the active voting period
-    # @arc4.abimethod()
-    # def submit_vote(self, choice: UInt64) -> None:
-    #     # Make necessary assertions to verify transaction requirements
+    @arc4.abimethod()
+    def submit_vote(self, choice: arc4.UInt8) -> None:
+        # Make necessary assertions to verify transaction requirements
 
-    #     # assert self.vote_status[Txn.sender] == UInt64(0) and self.vote_choice[Txn.sender] == UInt64(0)
+        assert (
+            Txn.sender in self.box_a_voter_data
+        ), "Account not found as key in voter data box."
 
-    #     # assert self.vote_status.maybe(Txn.sender)[1] == False, "This account already submitted a vote."
+        assert (
+            self.box_a_voter_data[Txn.sender].voted,
+            self.box_a_voter_data[Txn.sender].choice,
+        ) == (arc4.UInt8(0), arc4.UInt8(0)), "Account already submitted a vote."
 
-    #     # bla = self.vote_status.maybe(Txn.sender)[1]
-    #     # bla[1]
+        # assert account.is_opted_in(
+        #     Application(Global.current_application_id.id)
+        # ), "Account must be opted-in before voting."
 
-    #     # assert account.is_opted_in(
-    #     #     Application(Global.current_application_id.id)
-    #     # ), "Account must be opted-in before voting."
+        # assert (
+        #     Global.latest_timestamp >= self.poll_start_date_unix
+        # ), "Voting period has not started yet."
 
-    #     # assert (
-    #     #     Global.latest_timestamp >= self.poll_start_date_unix
-    #     # ), "Voting period has not started yet."
+        # assert (
+        #     Global.latest_timestamp <= self.poll_end_date_unix
+        # ), "Voting period has ended."
 
-    #     # assert (
-    #     #     Global.latest_timestamp <= self.poll_end_date_unix
-    #     # ), "Voting period has ended."
+        # assert (
+        #     self.local_vote_status[account] == UInt64(0) and self.local_vote_choice[account] == UInt64(0)
+        # ), "This account already submitted a vote or have not opted-in yet."
 
-    #     # assert (
-    #     #     self.local_vote_status[account] == UInt64(0) and self.local_vote_choice[account] == UInt64(0)
-    #     # ), "This account already submitted a vote or have not opted-in yet."
+        assert (
+            choice == arc4.UInt8(1)
+            or choice == arc4.UInt8(2)
+            or choice == arc4.UInt8(3)
+        ), "Invalid choice. Can only choose between choices 1, 2, 3."
 
-    #     assert (
-    #         choice == UInt64(1) or choice == UInt64(2) or choice == UInt64(3)
-    #     ), "Invalid choice. Can only choose between choices 1, 2, 3."
+        # self.local_vote_choice[account] = choice  # Set account vote choice (choice selected)
+        # self.local_vote_status[account] = UInt64(1)  # Set account vote status (has voted)
 
-    #     self.vote_choice[Txn.sender] = choice
-    #     self.vote_status[Txn.sender] = UInt64(1)
+        # Set account voter data
+        self.box_a_voter_data[Txn.sender] = VoterData(arc4.UInt8(1), choice)
 
-    #     # self.local_vote_choice[account] = choice  # Set account vote choice (choice selected)
-    #     # self.local_vote_status[account] = UInt64(1)  # Set account vote status (has voted)
+        # Update vote tally
+        if choice == UInt64(1):
+            self.choice1_total += UInt64(1)
+        elif choice == UInt64(2):
+            self.choice2_total += UInt64(1)
+        else:
+            self.choice3_total += UInt64(1)
 
-    #     # Update vote tally
-    #     if choice == UInt64(1):
-    #         self.choice1_total += UInt64(1)
-    #     elif choice == UInt64(2):
-    #         self.choice2_total += UInt64(1)
-    #     else:
-    #         self.choice3_total += UInt64(1)
-
-    #     # Increment count for total votes
-    #     self.total_votes += UInt64(1)
+        # Increment count for total votes
+        self.total_votes += UInt64(1)
 
     # Allows the creator to delete the smart contract client
     @arc4.abimethod(create="disallow", allow_actions=["DeleteApplication"])
