@@ -101,7 +101,8 @@ def setup_stxn(
         extra_fee=extra_fee if extra_fee > 0 else 0,
         first_valid_round=algorand.client.algod.status().get("last-round"),
         last_valid_round=algorand.client.algod.status().get("last-round") + 1000,
-        validity_window=validity_window)
+        validity_window=validity_window,
+    )
 
     # Using the Algorand client, prepare a payment transaction with the payment parameters defined above
     txn = algorand.transactions.payment(payment_params)
@@ -244,16 +245,10 @@ def read_box_data(
     algorand: AlgorandClient, app_id: int, box_name: bytes, logger: logging.Logger
 ) -> None:
 
-    # Uncomment to check every box being used in client with app id
-    app_boxes = algorand.client.algod.application_boxes(app_id)
-    logger.info(f"app boxes array: {app_boxes["boxes"]}")
-    logger.info(f"num of app boxes: {len(app_boxes["boxes"])}")
-
     box = algorand.client.algod.application_box_by_name(app_id, box_name)
     box_title = base64.b64decode(box["name"])
     box_value = list(base64.b64decode(box["value"]))
 
-    #[-2-32:-2]
     if len(box_title[-32:]) == 32:
         addr_base32 = encode_address(box_title[-32:])
         logger.info(

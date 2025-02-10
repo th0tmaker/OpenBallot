@@ -1,143 +1,59 @@
 #pragma version 10
-#pragma typetrack false
 
-// smart_contracts.open_ballot.contract.OpenBallot.__algopy_entrypoint_with_init() -> uint64:
-main:
-    intcblock 1 0 16900 116 1000 TMPL_VERSION_UNIX TMPL_DELETABLE
-    bytecblock 0x615f "total_box_a_" "total_cleaned_box_a_" "poll_finalized" "total_choice1" "total_choice2" "total_choice3" "total_votes" "poll_end_date_unix" 0x0000
+smart_contracts.open_ballot.contract.OpenBallot.approval_program:
+    intcblock 1 0 1000 116 TMPL_VERSION_UNIX TMPL_DELETABLE
+    bytecblock 0x615f "total_purged_box_a_" "poll_finalized" "total_choice1" "total_choice2" "total_choice3" "total_votes" "poll_end_date_unix" 0x0000
+    callsub __puya_arc4_router__
+    return
+
+
+// smart_contracts.open_ballot.contract.OpenBallot.__puya_arc4_router__() -> uint64:
+__puya_arc4_router__:
     // smart_contracts/open_ballot/contract.py:25
     // class OpenBallot(ARC4Contract):
+    proto 0 1
     txn NumAppArgs
-    bz main_after_if_else@14
-    pushbytess 0x5be219f0 0x81e1658f 0xe6bf4f23 0xfe7b6e39 0x8c2ecf22 0x6e0b83b9 0x761dd0fa 0xdcc9ce3b 0x5ff16da4 // method "generate()void", method "get_version_unix()uint64", method "set_poll(byte[],byte[],byte[],byte[],uint64,uint64)void", method "fund_app_mbr(pay)void", method "request_box_storage(pay)void", method "delete_box_storage()void", method "submit_vote(uint8)void", method "cleanup_box_storage(address[])void", method "terminate()void"
+    bz __puya_arc4_router___after_if_else@14
+    pushbytess 0x5be219f0 0x81e1658f 0xe6bf4f23 0xfe7b6e39 0x8c2ecf22 0x761dd0fa 0x6e0b83b9 0xbdefdf45 0x5ff16da4 // method "generate()void", method "get_version_unix()uint64", method "set_poll(byte[],byte[],byte[],byte[],uint64,uint64)void", method "fund_app_mbr(pay)void", method "request_box_storage(pay)void", method "submit_vote(uint8)void", method "delete_box_storage()void", method "purge_box_storage(address[])void", method "terminate()void"
     txna ApplicationArgs 0
-    match main_generate_route@5 main_get_version_unix_route@6 main_set_poll_route@7 main_fund_app_mbr_route@8 main_request_box_storage_route@9 main_delete_box_storage_route@10 main_submit_vote_route@11 main_cleanup_box_storage_route@12 main_terminate_route@13
-
-main_after_if_else@14:
-    // smart_contracts/open_ballot/contract.py:25
-    // class OpenBallot(ARC4Contract):
+    match __puya_arc4_router___generate_route@2 __puya_arc4_router___get_version_unix_route@3 __puya_arc4_router___set_poll_route@4 __puya_arc4_router___fund_app_mbr_route@5 __puya_arc4_router___request_box_storage_route@6 __puya_arc4_router___submit_vote_route@7 __puya_arc4_router___delete_box_storage_route@8 __puya_arc4_router___purge_box_storage_route@9 __puya_arc4_router___terminate_route@10
     intc_1 // 0
-    return
+    retsub
 
-main_terminate_route@13:
-    // smart_contracts/open_ballot/contract.py:388-389
-    // # Allow application creator to delete the smart contract client, decrease their MBR balance + any remaining box MBR
-    // @arc4.abimethod(create="disallow", allow_actions=["DeleteApplication"])
-    txn OnCompletion
-    pushint 5 // DeleteApplication
-    ==
-    assert // OnCompletion is not DeleteApplication
-    txn ApplicationID
-    assert // can only call when not creating
-    callsub terminate
-    intc_0 // 1
-    return
-
-main_cleanup_box_storage_route@12:
-    // smart_contracts/open_ballot/contract.py:357-358
-    // # Enable application creator to execute box storage cleanup, this deletes any boxes not deleted by other accounts
-    // @arc4.abimethod  # NOTE: Can also use arc4.StaticArray[arc4.Address, t.Literal[8]] to enforce strict size of 8
+__puya_arc4_router___generate_route@2:
+    // smart_contracts/open_ballot/contract.py:104-105
+    // # Call the 'Create' abimethod that generates the smart contract client and initializes global storage int variables
+    // @arc4.abimethod(create="require")
     txn OnCompletion
     !
     assert // OnCompletion is not NoOp
     txn ApplicationID
-    assert // can only call when not creating
-    // smart_contracts/open_ballot/contract.py:25
-    // class OpenBallot(ARC4Contract):
-    txna ApplicationArgs 1
-    // smart_contracts/open_ballot/contract.py:357-358
-    // # Enable application creator to execute box storage cleanup, this deletes any boxes not deleted by other accounts
-    // @arc4.abimethod  # NOTE: Can also use arc4.StaticArray[arc4.Address, t.Literal[8]] to enforce strict size of 8
-    callsub cleanup_box_storage
+    !
+    assert // can only call when creating
+    callsub generate
     intc_0 // 1
-    return
+    retsub
 
-main_submit_vote_route@11:
-    // smart_contracts/open_ballot/contract.py:305-306
-    // # Enable any eligible account to submit a vote
+__puya_arc4_router___get_version_unix_route@3:
+    // smart_contracts/open_ballot/contract.py:129-130
+    // # Retrieve the version of the smart contract in an Unix format timestamp
     // @arc4.abimethod
     txn OnCompletion
     !
     assert // OnCompletion is not NoOp
     txn ApplicationID
     assert // can only call when not creating
-    // smart_contracts/open_ballot/contract.py:25
-    // class OpenBallot(ARC4Contract):
-    txna ApplicationArgs 1
-    // smart_contracts/open_ballot/contract.py:305-306
-    // # Enable any eligible account to submit a vote
-    // @arc4.abimethod
-    callsub submit_vote
+    callsub get_version_unix
+    itob
+    pushbytes 0x151f7c75
+    swap
+    concat
+    log
     intc_0 // 1
-    return
+    retsub
 
-main_delete_box_storage_route@10:
-    // smart_contracts/open_ballot/contract.py:266-267
-    // # Enable any eligble account to delete their box storage and get their MBR payment refunded
-    // @arc4.abimethod
-    txn OnCompletion
-    !
-    assert // OnCompletion is not NoOp
-    txn ApplicationID
-    assert // can only call when not creating
-    callsub delete_box_storage
-    intc_0 // 1
-    return
-
-main_request_box_storage_route@9:
-    // smart_contracts/open_ballot/contract.py:231-232
-    // # Enable any eligible account to request box storage by paying a MBR cost
-    // @arc4.abimethod
-    txn OnCompletion
-    !
-    assert // OnCompletion is not NoOp
-    txn ApplicationID
-    assert // can only call when not creating
-    // smart_contracts/open_ballot/contract.py:25
-    // class OpenBallot(ARC4Contract):
-    txn GroupIndex
-    intc_0 // 1
-    -
-    dup
-    gtxns TypeEnum
-    intc_0 // pay
-    ==
-    assert // transaction type is pay
-    // smart_contracts/open_ballot/contract.py:231-232
-    // # Enable any eligible account to request box storage by paying a MBR cost
-    // @arc4.abimethod
-    callsub request_box_storage
-    intc_0 // 1
-    return
-
-main_fund_app_mbr_route@8:
-    // smart_contracts/open_ballot/contract.py:192-193
-    // # Enable application creator to fund App address and covers its Global minimum balance and Box storage MBR
-    // @arc4.abimethod
-    txn OnCompletion
-    !
-    assert // OnCompletion is not NoOp
-    txn ApplicationID
-    assert // can only call when not creating
-    // smart_contracts/open_ballot/contract.py:25
-    // class OpenBallot(ARC4Contract):
-    txn GroupIndex
-    intc_0 // 1
-    -
-    dup
-    gtxns TypeEnum
-    intc_0 // pay
-    ==
-    assert // transaction type is pay
-    // smart_contracts/open_ballot/contract.py:192-193
-    // # Enable application creator to fund App address and covers its Global minimum balance and Box storage MBR
-    // @arc4.abimethod
-    callsub fund_app_mbr
-    intc_0 // 1
-    return
-
-main_set_poll_route@7:
-    // smart_contracts/open_ballot/contract.py:135-136
+__puya_arc4_router___set_poll_route@4:
+    // smart_contracts/open_ballot/contract.py:134-135
     // # Enable application creator to set up poll data values including title, choices, and dates
     // @arc4.abimethod
     txn OnCompletion
@@ -159,49 +75,135 @@ main_set_poll_route@7:
     btoi
     txna ApplicationArgs 6
     btoi
-    // smart_contracts/open_ballot/contract.py:135-136
+    // smart_contracts/open_ballot/contract.py:134-135
     // # Enable application creator to set up poll data values including title, choices, and dates
     // @arc4.abimethod
     callsub set_poll
     intc_0 // 1
-    return
+    retsub
 
-main_get_version_unix_route@6:
-    // smart_contracts/open_ballot/contract.py:130-131
-    // # Retrieve the version of the smart contract in an Unix format timestamp
+__puya_arc4_router___fund_app_mbr_route@5:
+    // smart_contracts/open_ballot/contract.py:193-194
+    // # Enable application creator to fund App address and covers its Global minimum balance and Box storage MBR
     // @arc4.abimethod
     txn OnCompletion
     !
     assert // OnCompletion is not NoOp
     txn ApplicationID
     assert // can only call when not creating
-    // smart_contracts/open_ballot/contract.py:133
-    // return TemplateVar[UInt64]("VERSION_UNIX")
-    intc 5 // TMPL_VERSION_UNIX
-    // smart_contracts/open_ballot/contract.py:130-131
-    // # Retrieve the version of the smart contract in an Unix format timestamp
-    // @arc4.abimethod
-    itob
-    pushbytes 0x151f7c75
-    swap
-    concat
-    log
+    // smart_contracts/open_ballot/contract.py:25
+    // class OpenBallot(ARC4Contract):
+    txn GroupIndex
     intc_0 // 1
-    return
+    -
+    dup
+    gtxns TypeEnum
+    intc_0 // pay
+    ==
+    assert // transaction type is pay
+    // smart_contracts/open_ballot/contract.py:193-194
+    // # Enable application creator to fund App address and covers its Global minimum balance and Box storage MBR
+    // @arc4.abimethod
+    callsub fund_app_mbr
+    intc_0 // 1
+    retsub
 
-main_generate_route@5:
-    // smart_contracts/open_ballot/contract.py:104-105
-    // # Call the 'Create' abimethod that generates the smart contract client and initializes global storage int variables
-    // @arc4.abimethod(create="require")
+__puya_arc4_router___request_box_storage_route@6:
+    // smart_contracts/open_ballot/contract.py:233-234
+    // # Enable any eligible account to request box storage by paying a MBR cost
+    // @arc4.abimethod
     txn OnCompletion
     !
     assert // OnCompletion is not NoOp
     txn ApplicationID
-    !
-    assert // can only call when creating
-    callsub generate
+    assert // can only call when not creating
+    // smart_contracts/open_ballot/contract.py:25
+    // class OpenBallot(ARC4Contract):
+    txn GroupIndex
     intc_0 // 1
-    return
+    -
+    dup
+    gtxns TypeEnum
+    intc_0 // pay
+    ==
+    assert // transaction type is pay
+    // smart_contracts/open_ballot/contract.py:233-234
+    // # Enable any eligible account to request box storage by paying a MBR cost
+    // @arc4.abimethod
+    callsub request_box_storage
+    intc_0 // 1
+    retsub
+
+__puya_arc4_router___submit_vote_route@7:
+    // smart_contracts/open_ballot/contract.py:266-267
+    // # Enable any eligible account to submit a vote
+    // @arc4.abimethod
+    txn OnCompletion
+    !
+    assert // OnCompletion is not NoOp
+    txn ApplicationID
+    assert // can only call when not creating
+    // smart_contracts/open_ballot/contract.py:25
+    // class OpenBallot(ARC4Contract):
+    txna ApplicationArgs 1
+    // smart_contracts/open_ballot/contract.py:266-267
+    // # Enable any eligible account to submit a vote
+    // @arc4.abimethod
+    callsub submit_vote
+    intc_0 // 1
+    retsub
+
+__puya_arc4_router___delete_box_storage_route@8:
+    // smart_contracts/open_ballot/contract.py:321-322
+    // # Enable any eligble account to delete their box storage and get their MBR payment refunded
+    // @arc4.abimethod
+    txn OnCompletion
+    !
+    assert // OnCompletion is not NoOp
+    txn ApplicationID
+    assert // can only call when not creating
+    callsub delete_box_storage
+    intc_0 // 1
+    retsub
+
+__puya_arc4_router___purge_box_storage_route@9:
+    // smart_contracts/open_ballot/contract.py:359-360
+    // # Enable application creator to execute box storage purge, this deletes any boxes not deleted by other accounts
+    // @arc4.abimethod  # NOTE: Can also use arc4.StaticArray[arc4.Address, t.Literal[8]] to enforce strict size of 8
+    txn OnCompletion
+    !
+    assert // OnCompletion is not NoOp
+    txn ApplicationID
+    assert // can only call when not creating
+    // smart_contracts/open_ballot/contract.py:25
+    // class OpenBallot(ARC4Contract):
+    txna ApplicationArgs 1
+    // smart_contracts/open_ballot/contract.py:359-360
+    // # Enable application creator to execute box storage purge, this deletes any boxes not deleted by other accounts
+    // @arc4.abimethod  # NOTE: Can also use arc4.StaticArray[arc4.Address, t.Literal[8]] to enforce strict size of 8
+    callsub purge_box_storage
+    intc_0 // 1
+    retsub
+
+__puya_arc4_router___terminate_route@10:
+    // smart_contracts/open_ballot/contract.py:393-394
+    // # Allow application creator to delete the smart contract client, decrease their MBR balance + any remaining box MBR
+    // @arc4.abimethod(create="disallow", allow_actions=["DeleteApplication"])
+    txn OnCompletion
+    pushint 5 // DeleteApplication
+    ==
+    assert // OnCompletion is not DeleteApplication
+    txn ApplicationID
+    assert // can only call when not creating
+    callsub terminate
+    intc_0 // 1
+    retsub
+
+__puya_arc4_router___after_if_else@14:
+    // smart_contracts/open_ballot/contract.py:25
+    // class OpenBallot(ARC4Contract):
+    intc_1 // 0
+    retsub
 
 
 // smart_contracts.open_ballot.contract.OpenBallot.generate() -> void:
@@ -230,73 +232,120 @@ generate:
     // smart_contracts/open_ballot/contract.py:113
     // Global.min_balance
     global MinBalance
-    // smart_contracts/open_ballot/contract.py:74-75
-    // # Return the minimum balance requirement total cost
-    // return base_fee + total_byte_fee + total_uint_fee
-    pushint 556500 // 556500
+    // smart_contracts/open_ballot/contract.py:115
+    // num_bytes=UInt64(4), num_uint=UInt64(8)
+    pushints 4 8 // 4, 8
+    // smart_contracts/open_ballot/contract.py:114-116
+    // + self.calc_schema_mbr(
+    //     num_bytes=UInt64(4), num_uint=UInt64(8)
+    // )  # Global schema MBR: 0.1 (Global.min_balance) + 0.428 ALGO (Global schema)
+    callsub calc_schema_mbr
     // smart_contracts/open_ballot/contract.py:113-116
     // Global.min_balance
     // + self.calc_schema_mbr(
-    //     num_bytes=UInt64(4), num_uint=UInt64(9)
-    // )  # Global schema MBR: 0.1 (Global.min_balance) + 0.4565 ALGO (Global schema)
+    //     num_bytes=UInt64(4), num_uint=UInt64(8)
+    // )  # Global schema MBR: 0.1 (Global.min_balance) + 0.428 ALGO (Global schema)
     +
     // smart_contracts/open_ballot/contract.py:112-116
     // assert Global.creator_address.balance >= (
     //     Global.min_balance
     //     + self.calc_schema_mbr(
-    //         num_bytes=UInt64(4), num_uint=UInt64(9)
-    //     )  # Global schema MBR: 0.1 (Global.min_balance) + 0.4565 ALGO (Global schema)
+    //         num_bytes=UInt64(4), num_uint=UInt64(8)
+    //     )  # Global schema MBR: 0.1 (Global.min_balance) + 0.428 ALGO (Global schema)
     >=
     // smart_contracts/open_ballot/contract.py:112-117
     // assert Global.creator_address.balance >= (
     //     Global.min_balance
     //     + self.calc_schema_mbr(
-    //         num_bytes=UInt64(4), num_uint=UInt64(9)
-    //     )  # Global schema MBR: 0.1 (Global.min_balance) + 0.4565 ALGO (Global schema)
+    //         num_bytes=UInt64(4), num_uint=UInt64(8)
+    //     )  # Global schema MBR: 0.1 (Global.min_balance) + 0.428 ALGO (Global schema)
     // ), "Application creator address balance must be equal or greater than Global.min_balance + Global schema MBR."
     assert // Application creator address balance must be equal or greater than Global.min_balance + Global schema MBR.
     // smart_contracts/open_ballot/contract.py:119-120
     // # Initialize Global storage with default value assignments
     // self.poll_finalized = UInt64(0)
-    bytec_3 // "poll_finalized"
+    bytec_2 // "poll_finalized"
     intc_1 // 0
     app_global_put
     // smart_contracts/open_ballot/contract.py:122
     // self.total_choice1 = UInt64(0)
-    bytec 4 // "total_choice1"
+    bytec_3 // "total_choice1"
     intc_1 // 0
     app_global_put
     // smart_contracts/open_ballot/contract.py:123
     // self.total_choice2 = UInt64(0)
-    bytec 5 // "total_choice2"
+    bytec 4 // "total_choice2"
     intc_1 // 0
     app_global_put
     // smart_contracts/open_ballot/contract.py:124
     // self.total_choice3 = UInt64(0)
-    bytec 6 // "total_choice3"
+    bytec 5 // "total_choice3"
     intc_1 // 0
     app_global_put
     // smart_contracts/open_ballot/contract.py:125
     // self.total_votes = UInt64(0)
-    bytec 7 // "total_votes"
+    bytec 6 // "total_votes"
     intc_1 // 0
     app_global_put
     // smart_contracts/open_ballot/contract.py:127
-    // self.total_box_a_ = UInt64(0)
-    bytec_1 // "total_box_a_"
-    intc_1 // 0
-    app_global_put
-    // smart_contracts/open_ballot/contract.py:128
-    // self.total_cleaned_box_a_ = UInt64(0)
-    bytec_2 // "total_cleaned_box_a_"
+    // self.total_purged_box_a_ = UInt64(0)
+    bytec_1 // "total_purged_box_a_"
     intc_1 // 0
     app_global_put
     retsub
 
 
+// smart_contracts.open_ballot.contract.OpenBallot.calc_schema_mbr(num_bytes: uint64, num_uint: uint64) -> uint64:
+calc_schema_mbr:
+    // smart_contracts/open_ballot/contract.py:61-63
+    // # Calculate the Global and Local schema minimum balance requirement total cost for the smart contract
+    // @subroutine
+    // def calc_schema_mbr(self, num_bytes: UInt64, num_uint: UInt64) -> UInt64:
+    proto 2 1
+    // smart_contracts/open_ballot/contract.py:67
+    // byte_fee = UInt64(50_000)  # Byte slice fee for key-value pair (25_000 + 25_000)
+    pushint 50000 // 50000
+    // smart_contracts/open_ballot/contract.py:70-71
+    // # Multiply respective fee cost with the number of key-value pairs in each schema to get total fee amount
+    // total_byte_fee = byte_fee * num_bytes
+    frame_dig -2
+    *
+    // smart_contracts/open_ballot/contract.py:68
+    // uint_fee = UInt64(28_500)  # UInt64 fee for key-value pair (25_000 + 3_500)
+    pushint 28500 // 28500
+    // smart_contracts/open_ballot/contract.py:72
+    // total_uint_fee = uint_fee * num_uint
+    frame_dig -1
+    *
+    // smart_contracts/open_ballot/contract.py:65-66
+    // # Schema individual fees
+    // base_fee = UInt64(100_000)  # Base fee (100_000 * (1 + ExtraProgramPages))
+    pushint 100000 // 100000
+    // smart_contracts/open_ballot/contract.py:74-75
+    // # Return the minimum balance requirement total cost
+    // return base_fee + total_byte_fee + total_uint_fee
+    uncover 2
+    +
+    +
+    retsub
+
+
+// smart_contracts.open_ballot.contract.OpenBallot.get_version_unix() -> uint64:
+get_version_unix:
+    // smart_contracts/open_ballot/contract.py:129-131
+    // # Retrieve the version of the smart contract in an Unix format timestamp
+    // @arc4.abimethod
+    // def get_version_unix(self) -> UInt64:
+    proto 0 1
+    // smart_contracts/open_ballot/contract.py:132
+    // return TemplateVar[UInt64]("VERSION_UNIX")
+    intc 4 // TMPL_VERSION_UNIX
+    retsub
+
+
 // smart_contracts.open_ballot.contract.OpenBallot.set_poll(title: bytes, choice1: bytes, choice2: bytes, choice3: bytes, start_date_unix: uint64, end_date_unix: uint64) -> void:
 set_poll:
-    // smart_contracts/open_ballot/contract.py:135-145
+    // smart_contracts/open_ballot/contract.py:134-144
     // # Enable application creator to set up poll data values including title, choices, and dates
     // @arc4.abimethod
     // def set_poll(
@@ -309,78 +358,86 @@ set_poll:
     //     end_date_unix: UInt64,
     // ) -> None:
     proto 6 0
-    // smart_contracts/open_ballot/contract.py:146-147
-    // # Make necessary assertions to verify transaction requirements
-    // assert Txn.sender == Global.creator_address, "Only application creator can set up poll."
+    // smart_contracts/open_ballot/contract.py:147
+    // Txn.sender == Global.creator_address
     txn Sender
     global CreatorAddress
     ==
+    // smart_contracts/open_ballot/contract.py:145-148
+    // # Make necessary assertions to verify transaction requirements
+    // assert (
+    //     Txn.sender == Global.creator_address
+    // ), "Only application creator can set up poll."
     assert // Only application creator can set up poll.
-    // smart_contracts/open_ballot/contract.py:149
+    // smart_contracts/open_ballot/contract.py:150
     // assert title.length <= UInt64(
     frame_dig -6
     len
-    // smart_contracts/open_ballot/contract.py:149-151
+    // smart_contracts/open_ballot/contract.py:150-152
     // assert title.length <= UInt64(
     //     118
     // ), "Poll title size can not exceed 118 bytes of data per key-value."
     pushint 118 // 118
     <=
     assert // Poll title size can not exceed 118 bytes of data per key-value.
-    // smart_contracts/open_ballot/contract.py:154
+    // smart_contracts/open_ballot/contract.py:155
     // choice1.length <= UInt64(116)
     frame_dig -5
     len
     intc_3 // 116
     <=
-    // smart_contracts/open_ballot/contract.py:154-156
-    // choice1.length <= UInt64(116)
-    // and choice2.length <= UInt64(116)
-    // and choice3.length <= UInt64(116)
-    bz set_poll_bool_false@4
-    // smart_contracts/open_ballot/contract.py:155
-    // and choice2.length <= UInt64(116)
-    frame_dig -4
-    len
-    intc_3 // 116
-    <=
-    // smart_contracts/open_ballot/contract.py:154-156
+    // smart_contracts/open_ballot/contract.py:155-157
     // choice1.length <= UInt64(116)
     // and choice2.length <= UInt64(116)
     // and choice3.length <= UInt64(116)
     bz set_poll_bool_false@4
     // smart_contracts/open_ballot/contract.py:156
+    // and choice2.length <= UInt64(116)
+    frame_dig -4
+    len
+    intc_3 // 116
+    <=
+    // smart_contracts/open_ballot/contract.py:155-157
+    // choice1.length <= UInt64(116)
+    // and choice2.length <= UInt64(116)
+    // and choice3.length <= UInt64(116)
+    bz set_poll_bool_false@4
+    // smart_contracts/open_ballot/contract.py:157
     // and choice3.length <= UInt64(116)
     frame_dig -3
     len
     intc_3 // 116
     <=
-    // smart_contracts/open_ballot/contract.py:154-156
+    // smart_contracts/open_ballot/contract.py:155-157
     // choice1.length <= UInt64(116)
     // and choice2.length <= UInt64(116)
     // and choice3.length <= UInt64(116)
     bz set_poll_bool_false@4
     intc_0 // 1
+    b set_poll_bool_merge@5
+
+set_poll_bool_false@4:
+    intc_1 // 0
 
 set_poll_bool_merge@5:
-    // smart_contracts/open_ballot/contract.py:153-157
+    // smart_contracts/open_ballot/contract.py:154-158
     // assert (
     //     choice1.length <= UInt64(116)
     //     and choice2.length <= UInt64(116)
     //     and choice3.length <= UInt64(116)
     // ), "Poll choice size cannot exceed 116 bytes of data per key-value."
     assert // Poll choice size cannot exceed 116 bytes of data per key-value.
-    // smart_contracts/open_ballot/contract.py:168
+    // smart_contracts/open_ballot/contract.py:169
     // start_date_unix < end_date_unix
     frame_dig -2
     frame_dig -1
     <
-    // smart_contracts/open_ballot/contract.py:167-169
+    // smart_contracts/open_ballot/contract.py:168-170
     // assert (
     //     start_date_unix < end_date_unix
     // ), "Start date must be earlier than end date."
     assert // Start date must be earlier than end date.
-    // smart_contracts/open_ballot/contract.py:171-173
+    // smart_contracts/open_ballot/contract.py:172-174
     // assert end_date_unix >= start_date_unix + UInt64(
     //     3 * 24 * 60 * 60
     // ), "End date must be at least 3 days later than the start date."
@@ -390,89 +447,85 @@ set_poll_bool_merge@5:
     frame_dig -1
     <=
     assert // End date must be at least 3 days later than the start date.
-    // smart_contracts/open_ballot/contract.py:175
+    // smart_contracts/open_ballot/contract.py:176
     // assert end_date_unix - start_date_unix <= UInt64(
     frame_dig -1
     frame_dig -2
     -
-    // smart_contracts/open_ballot/contract.py:175-177
+    // smart_contracts/open_ballot/contract.py:176-178
     // assert end_date_unix - start_date_unix <= UInt64(
     //     14 * 24 * 60 * 60
     // ), "Voting period can not exceed 14 days."
     pushint 1209600 // 1209600
     <=
     assert // Voting period can not exceed 14 days.
-    // smart_contracts/open_ballot/contract.py:179
+    // smart_contracts/open_ballot/contract.py:180
     // assert self.poll_finalized == UInt64(0), "Poll can only be setup once."
     intc_1 // 0
-    bytec_3 // "poll_finalized"
+    bytec_2 // "poll_finalized"
     app_global_get_ex
     assert // check self.poll_finalized exists
     !
     assert // Poll can only be setup once.
-    // smart_contracts/open_ballot/contract.py:181-182
+    // smart_contracts/open_ballot/contract.py:182-183
     // # Update global state keys with new values
     // self.poll_title = title
     pushbytes "poll_title"
     frame_dig -6
     app_global_put
-    // smart_contracts/open_ballot/contract.py:183
+    // smart_contracts/open_ballot/contract.py:184
     // self.poll_choice1 = choice1
     pushbytes "poll_choice1"
     frame_dig -5
     app_global_put
-    // smart_contracts/open_ballot/contract.py:184
+    // smart_contracts/open_ballot/contract.py:185
     // self.poll_choice2 = choice2
     pushbytes "poll_choice2"
     frame_dig -4
     app_global_put
-    // smart_contracts/open_ballot/contract.py:185
+    // smart_contracts/open_ballot/contract.py:186
     // self.poll_choice3 = choice3
     pushbytes "poll_choice3"
     frame_dig -3
     app_global_put
-    // smart_contracts/open_ballot/contract.py:186
+    // smart_contracts/open_ballot/contract.py:187
     // self.poll_start_date_unix = start_date_unix
     pushbytes "poll_start_date_unix"
     frame_dig -2
     app_global_put
-    // smart_contracts/open_ballot/contract.py:187
+    // smart_contracts/open_ballot/contract.py:188
     // self.poll_end_date_unix = end_date_unix
-    bytec 8 // "poll_end_date_unix"
+    bytec 7 // "poll_end_date_unix"
     frame_dig -1
     app_global_put
-    // smart_contracts/open_ballot/contract.py:189-190
+    // smart_contracts/open_ballot/contract.py:190-191
     // # Finalize poll (ensures poll can only be set once)
     // self.poll_finalized = UInt64(1)
-    bytec_3 // "poll_finalized"
+    bytec_2 // "poll_finalized"
     intc_0 // 1
     app_global_put
     retsub
 
-set_poll_bool_false@4:
-    intc_1 // 0
-    b set_poll_bool_merge@5
-
 
 // smart_contracts.open_ballot.contract.OpenBallot.fund_app_mbr(mbr_pay: uint64) -> void:
 fund_app_mbr:
-    // smart_contracts/open_ballot/contract.py:192-194
+    // smart_contracts/open_ballot/contract.py:193-195
     // # Enable application creator to fund App address and covers its Global minimum balance and Box storage MBR
     // @arc4.abimethod
     // def fund_app_mbr(self, mbr_pay: gtxn.PaymentTransaction) -> None:
     proto 1 0
-    // smart_contracts/open_ballot/contract.py:197
+    // smart_contracts/open_ballot/contract.py:198
     // Txn.sender == Global.creator_address
     txn Sender
     global CreatorAddress
     ==
-    // smart_contracts/open_ballot/contract.py:195-198
+    // smart_contracts/open_ballot/contract.py:196-199
     // # Make necessary assertions to verify transaction requirements
     // assert (
     //     Txn.sender == Global.creator_address
     // ), "Transaction sender address must match application creator address."
     assert // Transaction sender address must match application creator address.
-    // smart_contracts/open_ballot/contract.py:201
+    // smart_contracts/open_ballot/contract.py:202
     // Txn.sender not in self.box_a_voter_data
     bytec_0 // 0x615f
     txn Sender
@@ -480,89 +533,83 @@ fund_app_mbr:
     box_len
     bury 1
     !
-    // smart_contracts/open_ballot/contract.py:200-202
+    // smart_contracts/open_ballot/contract.py:201-203
     // assert (
     //     Txn.sender not in self.box_a_voter_data
     // ), "Transaction sender address already present in box a_."
     assert // Transaction sender address already present in box a_.
-    // smart_contracts/open_ballot/contract.py:205
+    // smart_contracts/open_ballot/contract.py:206
     // mbr_pay.sender == Global.creator_address
     frame_dig -1
     gtxns Sender
     global CreatorAddress
     ==
-    // smart_contracts/open_ballot/contract.py:204-206
+    // smart_contracts/open_ballot/contract.py:205-207
     // assert (
     //     mbr_pay.sender == Global.creator_address
     // ), "MBR payment sender address must match appplication creator address."
     assert // MBR payment sender address must match appplication creator address.
-    // smart_contracts/open_ballot/contract.py:209
+    // smart_contracts/open_ballot/contract.py:210
     // mbr_pay.receiver == Global.current_application_address
     frame_dig -1
     gtxns Receiver
     global CurrentApplicationAddress
     ==
-    // smart_contracts/open_ballot/contract.py:208-210
+    // smart_contracts/open_ballot/contract.py:209-211
     // assert (
     //     mbr_pay.receiver == Global.current_application_address
     // ), "MBR payment reciever address must match application address."
     assert // MBR payment reciever address must match application address.
-    // smart_contracts/open_ballot/contract.py:213
+    // smart_contracts/open_ballot/contract.py:214
     // mbr_pay.amount
     frame_dig -1
     gtxns Amount
-    // smart_contracts/open_ballot/contract.py:89-90
-    // # Return single box fee
-    // return base_fee.native + size_fee
-    intc_2 // 16900
-    // smart_contracts/open_ballot/contract.py:213-214
+    // smart_contracts/open_ballot/contract.py:215
+    // >= self.calc_box_storage_mbr()  # Box Storage MBR: 0.0169 ALGO
+    callsub calc_box_storage_mbr
+    // smart_contracts/open_ballot/contract.py:214-215
     // mbr_pay.amount
     // >= self.calc_box_storage_mbr()  # Box Storage MBR: 0.0169 ALGO
     >=
-    // smart_contracts/open_ballot/contract.py:212-215
+    // smart_contracts/open_ballot/contract.py:213-216
     // assert (
     //     mbr_pay.amount
     //     >= self.calc_box_storage_mbr()  # Box Storage MBR: 0.0169 ALGO
     // ), "MBR payment for box storage must meet the minimum requirement amount."
     assert // MBR payment for box storage must meet the minimum requirement amount.
-    // smart_contracts/open_ballot/contract.py:217
+    // smart_contracts/open_ballot/contract.py:218
     // assert Global.current_application_address.balance >= (
     global CurrentApplicationAddress
     acct_params_get AcctBalance
     assert // account funded
-    // smart_contracts/open_ballot/contract.py:218
+    // smart_contracts/open_ballot/contract.py:219
     // Global.min_balance + self.calc_box_storage_mbr()
     global MinBalance
-    // smart_contracts/open_ballot/contract.py:89-90
-    // # Return single box fee
-    // return base_fee.native + size_fee
-    intc_2 // 16900
-    // smart_contracts/open_ballot/contract.py:218
-    // Global.min_balance + self.calc_box_storage_mbr()
+    callsub calc_box_storage_mbr
     +
-    // smart_contracts/open_ballot/contract.py:217-218
+    // smart_contracts/open_ballot/contract.py:218-219
     // assert Global.current_application_address.balance >= (
     //     Global.min_balance + self.calc_box_storage_mbr()
     >=
-    // smart_contracts/open_ballot/contract.py:217-219
+    // smart_contracts/open_ballot/contract.py:218-220
     // assert Global.current_application_address.balance >= (
     //     Global.min_balance + self.calc_box_storage_mbr()
     // ), "Application address balance must be equal or greater than Global.min_balance + Box storage fee."
     assert // Application address balance must be equal or greater than Global.min_balance + Box storage fee.
-    // smart_contracts/open_ballot/contract.py:222
+    // smart_contracts/open_ballot/contract.py:223
     // Global.latest_timestamp <= self.poll_end_date_unix
     global LatestTimestamp
     intc_1 // 0
-    bytec 8 // "poll_end_date_unix"
+    bytec 7 // "poll_end_date_unix"
     app_global_get_ex
     assert // check self.poll_end_date_unix exists
     <=
-    // smart_contracts/open_ballot/contract.py:221-223
+    // smart_contracts/open_ballot/contract.py:222-224
     // assert (
     //     Global.latest_timestamp <= self.poll_end_date_unix
     // ), "Unable to fund app mbr if voting period is over."
     assert // Unable to fund app mbr if voting period is over.
-    // smart_contracts/open_ballot/contract.py:225-227
+    // smart_contracts/open_ballot/contract.py:226-228
     // # Check if voter data box doesn't already exist, if not (False) then create new one
     // # if not self.box_a_voter_data.maybe(Txn.sender)[1]: <- This works too if copy() used
     // if Global.creator_address not in self.box_a_voter_data:
@@ -572,48 +619,95 @@ fund_app_mbr:
     box_len
     bury 1
     bnz fund_app_mbr_after_if_else@2
-    // smart_contracts/open_ballot/contract.py:228
-    // self.box_a_voter_data[Global.creator_address] = VoterData(arc4.UInt8(0), arc4.UInt8(0))
+    // smart_contracts/open_ballot/contract.py:229
+    // self.box_a_voter_data[Global.creator_address] = VoterData(
     bytec_0 // 0x615f
     global CreatorAddress
     concat
-    bytec 9 // 0x0000
+    // smart_contracts/open_ballot/contract.py:229-231
+    // self.box_a_voter_data[Global.creator_address] = VoterData(
+    //     arc4.UInt8(0), arc4.UInt8(0)
+    // )
+    bytec 8 // 0x0000
     box_put
-    // smart_contracts/open_ballot/contract.py:229
-    // self.total_box_a_ += UInt64(1)
-    intc_1 // 0
-    bytec_1 // "total_box_a_"
-    app_global_get_ex
-    assert // check self.total_box_a_ exists
-    intc_0 // 1
-    +
-    bytec_1 // "total_box_a_"
-    swap
-    app_global_put
 
 fund_app_mbr_after_if_else@2:
     retsub
 
 
+// smart_contracts.open_ballot.contract.OpenBallot.calc_box_storage_mbr() -> uint64:
+calc_box_storage_mbr:
+    // smart_contracts/open_ballot/contract.py:92-94
+    // # Calculate the Box storage minimum balance requirement total cost for the smart contract
+    // @subroutine
+    // def calc_box_storage_mbr(self) -> UInt64:
+    proto 0 1
+    // smart_contracts/open_ballot/contract.py:98
+    // arc4.UInt8(34), arc4.UInt8(2)
+    pushbytess 0x22 0x02 // 0x22, 0x02
+    // smart_contracts/open_ballot/contract.py:96-99
+    // # Calculate Box A fee
+    // box_a_ = self.calc_single_box_fee(
+    //     arc4.UInt8(34), arc4.UInt8(2)
+    // )  # fee: 0.0169 ALGO
+    callsub calc_single_box_fee
+    // smart_contracts/open_ballot/contract.py:101-102
+    // # Return the minimum balance requirement total cost
+    // return box_a_
+    retsub
+
+
+// smart_contracts.open_ballot.contract.OpenBallot.calc_single_box_fee(key_size: bytes, value_size: bytes) -> uint64:
+calc_single_box_fee:
+    // smart_contracts/open_ballot/contract.py:77-81
+    // # Calculate box fee for single box unit
+    // @subroutine
+    // def calc_single_box_fee(
+    //     self, key_size: arc4.UInt8, value_size: arc4.UInt8
+    // ) -> UInt64:
+    proto 2 1
+    // smart_contracts/open_ballot/contract.py:86
+    // key_size.native + value_size.native
+    frame_dig -2
+    btoi
+    frame_dig -1
+    btoi
+    +
+    // smart_contracts/open_ballot/contract.py:85
+    // size_fee = arc4.UInt16(400).native * (
+    pushint 400 // 400
+    // smart_contracts/open_ballot/contract.py:85-87
+    // size_fee = arc4.UInt16(400).native * (
+    //     key_size.native + value_size.native
+    // )  # Size fee (400 per byte * (len(key)+len(value)))
+    *
+    // smart_contracts/open_ballot/contract.py:89-90
+    // # Return single box fee
+    // return base_fee.native + size_fee
+    pushint 2500 // 2500
+    +
+    retsub
+
+
 // smart_contracts.open_ballot.contract.OpenBallot.request_box_storage(mbr_pay: uint64) -> void:
 request_box_storage:
-    // smart_contracts/open_ballot/contract.py:231-233
+    // smart_contracts/open_ballot/contract.py:233-235
     // # Enable any eligible account to request box storage by paying a MBR cost
     // @arc4.abimethod
     // def request_box_storage(self, mbr_pay: gtxn.PaymentTransaction) -> None:
     proto 1 0
-    // smart_contracts/open_ballot/contract.py:236
+    // smart_contracts/open_ballot/contract.py:238
     // Txn.sender != Global.creator_address
     txn Sender
     global CreatorAddress
     !=
-    // smart_contracts/open_ballot/contract.py:234-237
+    // smart_contracts/open_ballot/contract.py:236-239
     // # Make necessary assertions to verify transaction requirements
     // assert (
     //     Txn.sender != Global.creator_address
-    // ),  "Invalid sender address! Application creator address already present in box a_."
-    assert // Invalid sender address! Application creator address already present in box a_.
-    // smart_contracts/open_ballot/contract.py:240
+    // ), "Invalid sender address! Application creator address can not use request box storage method."
+    assert // Invalid sender address! Application creator address can not use request box storage method.
+    // smart_contracts/open_ballot/contract.py:242
     // Txn.sender not in self.box_a_voter_data
     bytec_0 // 0x615f
     txn Sender
@@ -621,12 +715,12 @@ request_box_storage:
     box_len
     bury 1
     !
-    // smart_contracts/open_ballot/contract.py:239-241
+    // smart_contracts/open_ballot/contract.py:241-243
     // assert (
     //     Txn.sender not in self.box_a_voter_data
     // ), "Transaction sender address must not be present in box a_."
     assert // Transaction sender address must not be present in box a_.
-    // smart_contracts/open_ballot/contract.py:244
+    // smart_contracts/open_ballot/contract.py:246
     // mbr_pay.sender not in self.box_a_voter_data
     frame_dig -1
     gtxns Sender
@@ -636,54 +730,47 @@ request_box_storage:
     box_len
     bury 1
     !
-    // smart_contracts/open_ballot/contract.py:243-245
+    // smart_contracts/open_ballot/contract.py:245-247
     // assert (
     //     mbr_pay.sender not in self.box_a_voter_data
-    // ), "Box a_ payment sender address must not be present in box a_."
-    assert // Box a_ payment sender address must not be present in box a_.
-    // smart_contracts/open_ballot/contract.py:248
+    // ), "Box storage MBR payment sender address must not be present in box a_."
+    assert // Box storage MBR payment sender address must not be present in box a_.
+    // smart_contracts/open_ballot/contract.py:250
     // mbr_pay.receiver == Global.current_application_address
     frame_dig -1
     gtxns Receiver
     global CurrentApplicationAddress
     ==
-    // smart_contracts/open_ballot/contract.py:247-249
+    // smart_contracts/open_ballot/contract.py:249-251
     // assert (
     //     mbr_pay.receiver == Global.current_application_address
-    // ), "Box a_ payment reciever address must match application address."
-    assert // Box a_ payment reciever address must match application address.
-    // smart_contracts/open_ballot/contract.py:252
-    // mbr_pay.amount
+    // ), "Box storage MBR payment reciever address must match application address."
+    assert // Box storage MBR payment reciever address must match application address.
+    // smart_contracts/open_ballot/contract.py:254
+    // mbr_pay.amount >= self.calc_box_storage_mbr()  # Box a_ fee: 0.0169 ALGO
     frame_dig -1
     gtxns Amount
-    // smart_contracts/open_ballot/contract.py:89-90
-    // # Return single box fee
-    // return base_fee.native + size_fee
-    intc_2 // 16900
-    // smart_contracts/open_ballot/contract.py:252-253
-    // mbr_pay.amount
-    // >= self.calc_box_storage_mbr()  # Box a_ fee: 0.0169 ALGO
+    callsub calc_box_storage_mbr
     >=
-    // smart_contracts/open_ballot/contract.py:251-254
+    // smart_contracts/open_ballot/contract.py:253-255
     // assert (
-    //     mbr_pay.amount
-    //     >= self.calc_box_storage_mbr()  # Box a_ fee: 0.0169 ALGO
-    // ), "Box a_ payment amount must be equal or greater than box _a fee."
-    assert // Box a_ payment amount must be equal or greater than box _a fee.
-    // smart_contracts/open_ballot/contract.py:257
+    //     mbr_pay.amount >= self.calc_box_storage_mbr()  # Box a_ fee: 0.0169 ALGO
+    // ), "Box storage MBR payment amount must be equal or greater than box _a fee."
+    assert // Box storage MBR payment amount must be equal or greater than box _a fee.
+    // smart_contracts/open_ballot/contract.py:258
     // Global.latest_timestamp <= self.poll_end_date_unix
     global LatestTimestamp
     intc_1 // 0
-    bytec 8 // "poll_end_date_unix"
+    bytec 7 // "poll_end_date_unix"
     app_global_get_ex
     assert // check self.poll_end_date_unix exists
     <=
-    // smart_contracts/open_ballot/contract.py:256-258
+    // smart_contracts/open_ballot/contract.py:257-259
     // assert (
     //     Global.latest_timestamp <= self.poll_end_date_unix
     // ), "Unable to request box storage if voting period is over."
     assert // Unable to request box storage if voting period is over.
-    // smart_contracts/open_ballot/contract.py:260-262
+    // smart_contracts/open_ballot/contract.py:261-263
     // # Check if voter data box doesn't already exist, if not (False) then create new one
     // # if not self.box_a_voter_data.maybe(Txn.sender)[1]: <- This works too if copy() used
     // if Txn.sender not in self.box_a_voter_data:
@@ -693,153 +780,39 @@ request_box_storage:
     box_len
     bury 1
     bnz request_box_storage_after_if_else@2
-    // smart_contracts/open_ballot/contract.py:263
+    // smart_contracts/open_ballot/contract.py:264
     // self.box_a_voter_data[Txn.sender] = VoterData(arc4.UInt8(0), arc4.UInt8(0))
     bytec_0 // 0x615f
     txn Sender
     concat
-    bytec 9 // 0x0000
+    bytec 8 // 0x0000
     box_put
-    // smart_contracts/open_ballot/contract.py:264
-    // self.total_box_a_ += UInt64(1)  # Increment box 'a_' total amount
-    intc_1 // 0
-    bytec_1 // "total_box_a_"
-    app_global_get_ex
-    assert // check self.total_box_a_ exists
-    intc_0 // 1
-    +
-    bytec_1 // "total_box_a_"
-    swap
-    app_global_put
 
 request_box_storage_after_if_else@2:
     retsub
 
 
-// smart_contracts.open_ballot.contract.OpenBallot.delete_box_storage() -> void:
-delete_box_storage:
-    // smart_contracts/open_ballot/contract.py:266-268
-    // # Enable any eligble account to delete their box storage and get their MBR payment refunded
-    // @arc4.abimethod
-    // def delete_box_storage(self) -> None:
-    proto 0 0
-    // smart_contracts/open_ballot/contract.py:275
-    // Txn.sender in self.box_a_voter_data
-    bytec_0 // 0x615f
-    txn Sender
-    concat
-    box_len
-    bury 1
-    // smart_contracts/open_ballot/contract.py:274-276
-    // assert (
-    //     Txn.sender in self.box_a_voter_data
-    // ), "Transaction sender address must be present in box a_."
-    assert // Transaction sender address must be present in box a_.
-    // smart_contracts/open_ballot/contract.py:285-291
-    // box_storage_del_refund_itxn = itxn.Payment(
-    //     sender=Global.current_application_address,
-    //     receiver=Txn.sender,
-    //     amount=self.calc_box_storage_mbr() - min_txn_fee.native,
-    //     fee=min_txn_fee.native,
-    //     note="Account MBR refund for box storage deletion.",
-    // ).submit()
-    itxn_begin
-    // smart_contracts/open_ballot/contract.py:286
-    // sender=Global.current_application_address,
-    global CurrentApplicationAddress
-    // smart_contracts/open_ballot/contract.py:287
-    // receiver=Txn.sender,
-    txn Sender
-    // smart_contracts/open_ballot/contract.py:290
-    // note="Account MBR refund for box storage deletion.",
-    pushbytes "Account MBR refund for box storage deletion."
-    itxn_field Note
-    // smart_contracts/open_ballot/contract.py:288
-    // amount=self.calc_box_storage_mbr() - min_txn_fee.native,
-    pushint 15900 // 15900
-    itxn_field Amount
-    itxn_field Receiver
-    itxn_field Sender
-    // smart_contracts/open_ballot/contract.py:285
-    // box_storage_del_refund_itxn = itxn.Payment(
-    intc_0 // pay
-    itxn_field TypeEnum
-    // smart_contracts/open_ballot/contract.py:289
-    // fee=min_txn_fee.native,
-    intc 4 // 1000
-    itxn_field Fee
-    // smart_contracts/open_ballot/contract.py:285-291
-    // box_storage_del_refund_itxn = itxn.Payment(
-    //     sender=Global.current_application_address,
-    //     receiver=Txn.sender,
-    //     amount=self.calc_box_storage_mbr() - min_txn_fee.native,
-    //     fee=min_txn_fee.native,
-    //     note="Account MBR refund for box storage deletion.",
-    // ).submit()
-    itxn_submit
-    itxn Receiver
-    itxn Sender
-    // smart_contracts/open_ballot/contract.py:294
-    // box_storage_del_refund_itxn.sender == Global.current_application_address
-    global CurrentApplicationAddress
-    ==
-    // smart_contracts/open_ballot/contract.py:293-295
-    // assert (
-    //     box_storage_del_refund_itxn.sender == Global.current_application_address
-    //     ), "Box storage deletion refund itxn sender address must match application address."
-    assert // Box storage deletion refund itxn sender address must match application address.
-    // smart_contracts/open_ballot/contract.py:298
-    // box_storage_del_refund_itxn.receiver == Txn.sender
-    txn Sender
-    ==
-    // smart_contracts/open_ballot/contract.py:297-299
-    // assert (
-    //     box_storage_del_refund_itxn.receiver == Txn.sender
-    //     ), "Box storage deletion refund itxn reciever address must match transaction sender address."
-    assert // Box storage deletion refund itxn reciever address must match transaction sender address.
-    // smart_contracts/open_ballot/contract.py:301-302
-    // # Delete box key (address) from box storage and decrement box 'a_' total amount
-    // del self.box_a_voter_data[Txn.sender]
-    bytec_0 // 0x615f
-    txn Sender
-    concat
-    box_del
-    pop
-    // smart_contracts/open_ballot/contract.py:303
-    // self.total_box_a_ -= UInt64(1)
-    intc_1 // 0
-    bytec_1 // "total_box_a_"
-    app_global_get_ex
-    assert // check self.total_box_a_ exists
-    intc_0 // 1
-    -
-    bytec_1 // "total_box_a_"
-    swap
-    app_global_put
-    retsub
-
-
 // smart_contracts.open_ballot.contract.OpenBallot.submit_vote(choice: bytes) -> void:
 submit_vote:
-    // smart_contracts/open_ballot/contract.py:305-307
+    // smart_contracts/open_ballot/contract.py:266-268
     // # Enable any eligible account to submit a vote
     // @arc4.abimethod
     // def submit_vote(self, choice: arc4.UInt8) -> None:
     proto 1 0
-    // smart_contracts/open_ballot/contract.py:310
+    // smart_contracts/open_ballot/contract.py:271
     // Txn.sender in self.box_a_voter_data
     bytec_0 // 0x615f
     txn Sender
     concat
     box_len
     bury 1
-    // smart_contracts/open_ballot/contract.py:308-311
+    // smart_contracts/open_ballot/contract.py:269-272
     // # Make necessary assertions to verify transaction requirements
     // assert (
     //     Txn.sender in self.box_a_voter_data
     // ), "Transaction sender address must be present in box a_."
     assert // Transaction sender address must be present in box a_.
-    // smart_contracts/open_ballot/contract.py:314
+    // smart_contracts/open_ballot/contract.py:275
     // self.box_a_voter_data[Txn.sender].voted,
     bytec_0 // 0x615f
     txn Sender
@@ -847,16 +820,19 @@ submit_vote:
     box_get
     assert // check self.box_a_voter_data entry exists
     extract 0 1 // on error: Index access is out of bounds
-    // smart_contracts/open_ballot/contract.py:316
-    // ) == (arc4.UInt8(0), arc4.UInt8(0)), "Transaction sender address already submitted a vote."
+    // smart_contracts/open_ballot/contract.py:278
+    // arc4.UInt8(0),
     pushbytes 0x00
-    // smart_contracts/open_ballot/contract.py:313-316
+    // smart_contracts/open_ballot/contract.py:274-280
     // assert (
     //     self.box_a_voter_data[Txn.sender].voted,
     //     self.box_a_voter_data[Txn.sender].choice,
-    // ) == (arc4.UInt8(0), arc4.UInt8(0)), "Transaction sender address already submitted a vote."
+    // ) == (
+    //     arc4.UInt8(0),
+    //     arc4.UInt8(0),
+    // ), "Transaction sender address already submitted a vote."
     b==
-    // smart_contracts/open_ballot/contract.py:315
+    // smart_contracts/open_ballot/contract.py:276
     // self.box_a_voter_data[Txn.sender].choice,
     bytec_0 // 0x615f
     txn Sender
@@ -864,43 +840,46 @@ submit_vote:
     box_get
     assert // check self.box_a_voter_data entry exists
     extract 1 1 // on error: Index access is out of bounds
-    // smart_contracts/open_ballot/contract.py:316
-    // ) == (arc4.UInt8(0), arc4.UInt8(0)), "Transaction sender address already submitted a vote."
+    // smart_contracts/open_ballot/contract.py:279
+    // arc4.UInt8(0),
     pushbytes 0x00
-    // smart_contracts/open_ballot/contract.py:313-316
+    // smart_contracts/open_ballot/contract.py:274-280
     // assert (
     //     self.box_a_voter_data[Txn.sender].voted,
     //     self.box_a_voter_data[Txn.sender].choice,
-    // ) == (arc4.UInt8(0), arc4.UInt8(0)), "Transaction sender address already submitted a vote."
+    // ) == (
+    //     arc4.UInt8(0),
+    //     arc4.UInt8(0),
+    // ), "Transaction sender address already submitted a vote."
     b==
     &&
     assert // Transaction sender address already submitted a vote.
-    // smart_contracts/open_ballot/contract.py:335
+    // smart_contracts/open_ballot/contract.py:283
     // choice == arc4.UInt8(1)
     frame_dig -1
     pushbytes 0x01
     b==
-    // smart_contracts/open_ballot/contract.py:335-337
+    // smart_contracts/open_ballot/contract.py:283-285
     // choice == arc4.UInt8(1)
     // or choice == arc4.UInt8(2)
     // or choice == arc4.UInt8(3)
     bnz submit_vote_bool_true@3
-    // smart_contracts/open_ballot/contract.py:336
+    // smart_contracts/open_ballot/contract.py:284
     // or choice == arc4.UInt8(2)
     frame_dig -1
     pushbytes 0x02
     b==
-    // smart_contracts/open_ballot/contract.py:335-337
+    // smart_contracts/open_ballot/contract.py:283-285
     // choice == arc4.UInt8(1)
     // or choice == arc4.UInt8(2)
     // or choice == arc4.UInt8(3)
     bnz submit_vote_bool_true@3
-    // smart_contracts/open_ballot/contract.py:337
+    // smart_contracts/open_ballot/contract.py:285
     // or choice == arc4.UInt8(3)
     frame_dig -1
     pushbytes 0x03
     b==
-    // smart_contracts/open_ballot/contract.py:335-337
+    // smart_contracts/open_ballot/contract.py:283-285
     // choice == arc4.UInt8(1)
     // or choice == arc4.UInt8(2)
     // or choice == arc4.UInt8(3)
@@ -908,16 +887,20 @@ submit_vote:
 
 submit_vote_bool_true@3:
     intc_0 // 1
+    b submit_vote_bool_merge@5
+
+submit_vote_bool_false@4:
+    intc_1 // 0
 
 submit_vote_bool_merge@5:
-    // smart_contracts/open_ballot/contract.py:334-338
+    // smart_contracts/open_ballot/contract.py:282-286
     // assert (
     //     choice == arc4.UInt8(1)
     //     or choice == arc4.UInt8(2)
     //     or choice == arc4.UInt8(3)
     // ), "Invalid choice. Can only select choices 1, 2, 3."
     assert // Invalid choice. Can only select choices 1, 2, 3.
-    // smart_contracts/open_ballot/contract.py:343-344
+    // smart_contracts/open_ballot/contract.py:307-308
     // # Set account voter data
     // self.box_a_voter_data[Txn.sender] = VoterData(arc4.UInt8(1), choice)
     pushbytes 0x01
@@ -928,7 +911,7 @@ submit_vote_bool_merge@5:
     concat
     swap
     box_put
-    // smart_contracts/open_ballot/contract.py:346-347
+    // smart_contracts/open_ballot/contract.py:310-311
     // # Update vote tally
     // if choice == UInt64(1):
     intc_0 // 1
@@ -936,124 +919,243 @@ submit_vote_bool_merge@5:
     frame_dig -1
     b==
     bz submit_vote_else_body@7
-    // smart_contracts/open_ballot/contract.py:348
+    // smart_contracts/open_ballot/contract.py:312
     // self.total_choice1 += UInt64(1)
     intc_1 // 0
-    bytec 4 // "total_choice1"
+    bytec_3 // "total_choice1"
     app_global_get_ex
     assert // check self.total_choice1 exists
     intc_0 // 1
     +
-    bytec 4 // "total_choice1"
+    bytec_3 // "total_choice1"
     swap
     app_global_put
-
-submit_vote_after_if_else@11:
-    // smart_contracts/open_ballot/contract.py:354-355
-    // # Increment count for total votes
-    // self.total_votes += UInt64(1)
-    intc_1 // 0
-    bytec 7 // "total_votes"
-    app_global_get_ex
-    assert // check self.total_votes exists
-    intc_0 // 1
-    +
-    bytec 7 // "total_votes"
-    swap
-    app_global_put
-    retsub
+    b submit_vote_after_if_else@11
 
 submit_vote_else_body@7:
-    // smart_contracts/open_ballot/contract.py:349
+    // smart_contracts/open_ballot/contract.py:313
     // elif choice == UInt64(2):
     pushint 2 // 2
     itob
     frame_dig -1
     b==
     bz submit_vote_else_body@9
-    // smart_contracts/open_ballot/contract.py:350
+    // smart_contracts/open_ballot/contract.py:314
     // self.total_choice2 += UInt64(1)
     intc_1 // 0
-    bytec 5 // "total_choice2"
+    bytec 4 // "total_choice2"
     app_global_get_ex
     assert // check self.total_choice2 exists
     intc_0 // 1
     +
-    bytec 5 // "total_choice2"
+    bytec 4 // "total_choice2"
     swap
     app_global_put
     b submit_vote_after_if_else@11
 
 submit_vote_else_body@9:
-    // smart_contracts/open_ballot/contract.py:352
+    // smart_contracts/open_ballot/contract.py:316
     // self.total_choice3 += UInt64(1)
     intc_1 // 0
-    bytec 6 // "total_choice3"
+    bytec 5 // "total_choice3"
     app_global_get_ex
     assert // check self.total_choice3 exists
     intc_0 // 1
     +
-    bytec 6 // "total_choice3"
+    bytec 5 // "total_choice3"
     swap
     app_global_put
-    b submit_vote_after_if_else@11
 
-submit_vote_bool_false@4:
+submit_vote_after_if_else@11:
+    // smart_contracts/open_ballot/contract.py:318-319
+    // # Increment count for total votes
+    // self.total_votes += UInt64(1)
     intc_1 // 0
-    b submit_vote_bool_merge@5
+    bytec 6 // "total_votes"
+    app_global_get_ex
+    assert // check self.total_votes exists
+    intc_0 // 1
+    +
+    bytec 6 // "total_votes"
+    swap
+    app_global_put
+    retsub
 
 
-// smart_contracts.open_ballot.contract.OpenBallot.cleanup_box_storage(box_keys: bytes) -> void:
-cleanup_box_storage:
-    // smart_contracts/open_ballot/contract.py:357-359
-    // # Enable application creator to execute box storage cleanup, this deletes any boxes not deleted by other accounts
+// smart_contracts.open_ballot.contract.OpenBallot.delete_box_storage() -> void:
+delete_box_storage:
+    // smart_contracts/open_ballot/contract.py:321-323
+    // # Enable any eligble account to delete their box storage and get their MBR payment refunded
+    // @arc4.abimethod
+    // def delete_box_storage(self) -> None:
+    proto 0 0
+    // smart_contracts/open_ballot/contract.py:326
+    // Txn.sender != Global.creator_address
+    txn Sender
+    global CreatorAddress
+    !=
+    // smart_contracts/open_ballot/contract.py:324-327
+    // # Make necessary assertions to verify transaction requirements
+    // assert (
+    //     Txn.sender != Global.creator_address
+    // ), "Invalid sender address! Application creator must delete smart contract to free up their box storage MBR."
+    assert // Invalid sender address! Application creator must delete smart contract to free up their box storage MBR.
+    // smart_contracts/open_ballot/contract.py:330
+    // Txn.sender in self.box_a_voter_data
+    bytec_0 // 0x615f
+    txn Sender
+    concat
+    box_len
+    bury 1
+    // smart_contracts/open_ballot/contract.py:329-331
+    // assert (
+    //     Txn.sender in self.box_a_voter_data
+    // ), "Transaction sender address must be present in box a_."
+    assert // Transaction sender address must be present in box a_.
+    // smart_contracts/open_ballot/contract.py:338-339
+    // # Delete box key (address) from box storage and decrement box 'a_' total amount
+    // del self.box_a_voter_data[Txn.sender]
+    bytec_0 // 0x615f
+    txn Sender
+    concat
+    box_del
+    pop
+    // smart_contracts/open_ballot/contract.py:343-349
+    // box_storage_del_refund_itxn = itxn.Payment(
+    //     sender=Global.current_application_address,
+    //     receiver=Txn.sender,
+    //     amount=self.calc_box_storage_mbr() - min_txn_fee,
+    //     fee=min_txn_fee,
+    //     note="Account gets app box storage MBR refunded..",
+    // ).submit()
+    itxn_begin
+    // smart_contracts/open_ballot/contract.py:344
+    // sender=Global.current_application_address,
+    global CurrentApplicationAddress
+    // smart_contracts/open_ballot/contract.py:345
+    // receiver=Txn.sender,
+    txn Sender
+    // smart_contracts/open_ballot/contract.py:346
+    // amount=self.calc_box_storage_mbr() - min_txn_fee,
+    callsub calc_box_storage_mbr
+    // smart_contracts/open_ballot/contract.py:341-342
+    // # Submit inner transaction (transaction sender gets their Box storage MBR refunded)
+    // min_txn_fee = arc4.UInt16(1000).native
+    intc_2 // 1000
+    // smart_contracts/open_ballot/contract.py:346
+    // amount=self.calc_box_storage_mbr() - min_txn_fee,
+    -
+    // smart_contracts/open_ballot/contract.py:348
+    // note="Account gets app box storage MBR refunded..",
+    pushbytes "Account gets app box storage MBR refunded.."
+    itxn_field Note
+    itxn_field Amount
+    itxn_field Receiver
+    itxn_field Sender
+    // smart_contracts/open_ballot/contract.py:343
+    // box_storage_del_refund_itxn = itxn.Payment(
+    intc_0 // pay
+    itxn_field TypeEnum
+    // smart_contracts/open_ballot/contract.py:341-342
+    // # Submit inner transaction (transaction sender gets their Box storage MBR refunded)
+    // min_txn_fee = arc4.UInt16(1000).native
+    intc_2 // 1000
+    itxn_field Fee
+    // smart_contracts/open_ballot/contract.py:343-349
+    // box_storage_del_refund_itxn = itxn.Payment(
+    //     sender=Global.current_application_address,
+    //     receiver=Txn.sender,
+    //     amount=self.calc_box_storage_mbr() - min_txn_fee,
+    //     fee=min_txn_fee,
+    //     note="Account gets app box storage MBR refunded..",
+    // ).submit()
+    itxn_submit
+    itxn Receiver
+    itxn Sender
+    // smart_contracts/open_ballot/contract.py:352
+    // box_storage_del_refund_itxn.sender == Global.current_application_address
+    global CurrentApplicationAddress
+    ==
+    // smart_contracts/open_ballot/contract.py:351-353
+    // assert (
+    //     box_storage_del_refund_itxn.sender == Global.current_application_address
+    // ), "box_storage_del_refund_itxn sender address must match application address."
+    assert // box_storage_del_refund_itxn sender address must match application address.
+    // smart_contracts/open_ballot/contract.py:356
+    // box_storage_del_refund_itxn.receiver == Txn.sender
+    txn Sender
+    ==
+    // smart_contracts/open_ballot/contract.py:355-357
+    // assert (
+    //     box_storage_del_refund_itxn.receiver == Txn.sender
+    // ), "box_storage_del_refund_itxn reciever address must match transaction sender address."
+    assert // box_storage_del_refund_itxn reciever address must match transaction sender address.
+    retsub
+
+
+// smart_contracts.open_ballot.contract.OpenBallot.purge_box_storage(box_keys: bytes) -> void:
+purge_box_storage:
+    // smart_contracts/open_ballot/contract.py:359-361
+    // # Enable application creator to execute box storage purge, this deletes any boxes not deleted by other accounts
     // @arc4.abimethod  # NOTE: Can also use arc4.StaticArray[arc4.Address, t.Literal[8]] to enforce strict size of 8
-    // def cleanup_box_storage(self, box_keys: arc4.DynamicArray[arc4.Address]) -> None:
+    // def purge_box_storage(self, box_keys: arc4.DynamicArray[arc4.Address]) -> None:
     proto 1 0
-    // smart_contracts/open_ballot/contract.py:362
+    pushbytes ""
+    // smart_contracts/open_ballot/contract.py:364
     // Txn.sender == Global.creator_address
     txn Sender
     global CreatorAddress
     ==
-    // smart_contracts/open_ballot/contract.py:360-363
+    // smart_contracts/open_ballot/contract.py:362-365
     // # Make necessary assertions to verify transaction requirements
     // assert (
     //     Txn.sender == Global.creator_address
-    // ), "Unauthorized address! Only application creator can cleanup box storage."
-    assert // Unauthorized address! Only application creator can cleanup box storage.
-    // smart_contracts/open_ballot/contract.py:370
-    // box_keys.length <= 8
+    // ), "Unauthorized address! Only application creator can purge box storage."
+    assert // Unauthorized address! Only application creator can purge box storage.
+    // smart_contracts/open_ballot/contract.py:372
+    // box_keys.length > 0 and box_keys.length < 9
     frame_dig -1
     intc_1 // 0
     extract_uint16
     dup
-    pushint 8 // 8
-    <=
-    // smart_contracts/open_ballot/contract.py:369-371
-    // assert (
-    //     box_keys.length <= 8
-    // ), "Exceeded upper limit of boxes able to be deleted in a single application call transaction."
-    assert // Exceeded upper limit of boxes able to be deleted in a single application call transaction.
+    bz purge_box_storage_bool_false@3
+    frame_dig 1
+    pushint 9 // 9
+    <
+    bz purge_box_storage_bool_false@3
+    intc_0 // 1
+    b purge_box_storage_bool_merge@4
+
+purge_box_storage_bool_false@3:
     intc_1 // 0
 
-cleanup_box_storage_for_header@1:
-    // smart_contracts/open_ballot/contract.py:373-374
+purge_box_storage_bool_merge@4:
+    // smart_contracts/open_ballot/contract.py:371-373
+    // assert (
+    //     box_keys.length > 0 and box_keys.length < 9
+    // ), "The number of addresses represented by box keys array must be greater than 0 and lesser than 9."
+    assert // The number of addresses represented by box keys array must be greater than 0 and lesser than 9.
+    intc_1 // 0
+    frame_bury 0
+
+purge_box_storage_for_header@5:
+    // smart_contracts/open_ballot/contract.py:375-376
     // # Iterate through the dynamic array of addresses representing the box key
     // for box_key in box_keys:
-    frame_dig 1
     frame_dig 0
+    frame_dig 1
     <
-    bz cleanup_box_storage_after_for@4
+    bz purge_box_storage_after_for@8
     frame_dig -1
     extract 2 0
-    frame_dig 1
+    frame_dig 0
     dup
     cover 2
     pushint 32 // 32
     *
     pushint 32 // 32
     extract3 // on error: Index access is out of bounds
-    // smart_contracts/open_ballot/contract.py:377
+    // smart_contracts/open_ballot/contract.py:379
     // box_key.native in self.box_a_voter_data
     bytec_0 // 0x615f
     dig 1
@@ -1061,201 +1163,262 @@ cleanup_box_storage_for_header@1:
     dup
     box_len
     bury 1
-    // smart_contracts/open_ballot/contract.py:375-378
+    // smart_contracts/open_ballot/contract.py:377-380
     // # Make necessary assertions to verify transaction requirements
     // assert (
     //     box_key.native in self.box_a_voter_data
-    // ), "Account address represented by box key must be present in box a_."
-    assert // Account address represented by box key must be present in box a_.
-    // smart_contracts/open_ballot/contract.py:381
+    // ), "Account address represented in box key must be present in box a_."
+    assert // Account address represented in box key must be present in box a_.
+    // smart_contracts/open_ballot/contract.py:383
     // box_key.native != Global.creator_address
     global CreatorAddress
     uncover 2
     !=
-    // smart_contracts/open_ballot/contract.py:380-382
+    // smart_contracts/open_ballot/contract.py:382-384
     // assert (
     //     box_key.native != Global.creator_address
-    // ), "Account address represented by box key must match application creator address."
-    assert // Account address represented by box key must match application creator address.
-    // smart_contracts/open_ballot/contract.py:384
-    // del self.box_a_voter_data[box_key.native]  # Delete box key (address) from box storage
+    // ), "Account address represented in box key must not match application creator address."
+    assert // Account address represented in box key must not match application creator address.
+    // smart_contracts/open_ballot/contract.py:386-388
+    // del self.box_a_voter_data[
+    //     box_key.native
+    // ]  # Delete box key (address) from box storage
     box_del
     pop
-    // smart_contracts/open_ballot/contract.py:385
-    // self.total_box_a_ -= UInt64(1)  # Decrement box 'a_' total amount
+    // smart_contracts/open_ballot/contract.py:389
+    // self.total_purged_box_a_ += UInt64(
     intc_1 // 0
-    bytec_1 // "total_box_a_"
+    bytec_1 // "total_purged_box_a_"
     app_global_get_ex
-    assert // check self.total_box_a_ exists
-    intc_0 // 1
-    -
-    bytec_1 // "total_box_a_"
-    swap
-    app_global_put
-    // smart_contracts/open_ballot/contract.py:386
-    // self.total_cleaned_box_a_ += UInt64(1)  # Increment box 'a_' cleaned total amount
-    intc_1 // 0
-    bytec_2 // "total_cleaned_box_a_"
-    app_global_get_ex
-    assert // check self.total_cleaned_box_a_ exists
+    assert // check self.total_purged_box_a_ exists
+    // smart_contracts/open_ballot/contract.py:389-391
+    // self.total_purged_box_a_ += UInt64(
+    //     1
+    // )  # Increment box 'a_' purged total amount
     intc_0 // 1
     +
-    bytec_2 // "total_cleaned_box_a_"
+    // smart_contracts/open_ballot/contract.py:389
+    // self.total_purged_box_a_ += UInt64(
+    bytec_1 // "total_purged_box_a_"
+    // smart_contracts/open_ballot/contract.py:389-391
+    // self.total_purged_box_a_ += UInt64(
+    //     1
+    // )  # Increment box 'a_' purged total amount
     swap
     app_global_put
     intc_0 // 1
     +
-    frame_bury 1
-    b cleanup_box_storage_for_header@1
+    frame_bury 0
+    b purge_box_storage_for_header@5
 
-cleanup_box_storage_after_for@4:
+purge_box_storage_after_for@8:
     retsub
 
 
 // smart_contracts.open_ballot.contract.OpenBallot.terminate() -> void:
 terminate:
-    // smart_contracts/open_ballot/contract.py:388-390
+    // smart_contracts/open_ballot/contract.py:393-395
     // # Allow application creator to delete the smart contract client, decrease their MBR balance + any remaining box MBR
     // @arc4.abimethod(create="disallow", allow_actions=["DeleteApplication"])
     // def terminate(self) -> None:
     proto 0 0
-    // smart_contracts/open_ballot/contract.py:391-394
+    intc_1 // 0
+    // smart_contracts/open_ballot/contract.py:396-399
     // # Make necessary assertions to verify transaction requirements
     // assert TemplateVar[UInt64](
     //     "DELETABLE"
     // ), "Template variable 'DELETABLE' needs to be 'True' at deploy-time."
-    intc 6 // TMPL_DELETABLE
+    intc 5 // TMPL_DELETABLE
     assert // Template variable 'DELETABLE' needs to be 'True' at deploy-time.
-    // smart_contracts/open_ballot/contract.py:397
+    // smart_contracts/open_ballot/contract.py:402
     // Txn.sender == Global.creator_address
     txn Sender
     global CreatorAddress
     ==
-    // smart_contracts/open_ballot/contract.py:396-398
+    // smart_contracts/open_ballot/contract.py:401-403
     // assert (
     //     Txn.sender == Global.creator_address
     // ), "Unauthorized address! Only application creator can delete the smart contract."
     assert // Unauthorized address! Only application creator can delete the smart contract.
-    // smart_contracts/open_ballot/contract.py:401
+    // smart_contracts/open_ballot/contract.py:406
     // Global.creator_address in self.box_a_voter_data
     bytec_0 // 0x615f
     global CreatorAddress
     concat
     box_len
     bury 1
-    // smart_contracts/open_ballot/contract.py:400-402
+    // smart_contracts/open_ballot/contract.py:405-407
     // assert (
     //     Global.creator_address in self.box_a_voter_data
     // ), "Transaction sender address must be present in box a_."
     assert // Transaction sender address must be present in box a_.
-    // smart_contracts/open_ballot/contract.py:409-410
-    // # Delete box key (creator address) from box storage and decrement box 'a_' total amount
-    // del self.box_a_voter_data[Global.creator_address]  # 0.0169 ALGO
+    // smart_contracts/open_ballot/contract.py:413
+    // del self.box_a_voter_data[
     bytec_0 // 0x615f
+    // smart_contracts/open_ballot/contract.py:414
+    // Global.creator_address
     global CreatorAddress
+    // smart_contracts/open_ballot/contract.py:413-415
+    // del self.box_a_voter_data[
+    //     Global.creator_address
+    // ]  # Delete box key (address) from box storage (get 0.0169 ALGO)
     concat
     box_del
     pop
-    // smart_contracts/open_ballot/contract.py:411
-    // self.total_box_a_ -= UInt64(1)
+    // smart_contracts/open_ballot/contract.py:419
+    // if self.total_purged_box_a_ > UInt64(0):
     intc_1 // 0
-    bytec_1 // "total_box_a_"
+    bytec_1 // "total_purged_box_a_"
     app_global_get_ex
-    assert // check self.total_box_a_ exists
-    intc_0 // 1
-    -
-    bytec_1 // "total_box_a_"
-    swap
-    app_global_put
-    // smart_contracts/open_ballot/contract.py:415
-    // purge_refund_amount = self.total_cleaned_box_a_ * self.calc_box_storage_mbr() - min_txn_fee.native
-    intc_1 // 0
-    bytec_2 // "total_cleaned_box_a_"
-    app_global_get_ex
-    assert // check self.total_cleaned_box_a_ exists
-    // smart_contracts/open_ballot/contract.py:89-90
-    // # Return single box fee
-    // return base_fee.native + size_fee
-    intc_2 // 16900
-    // smart_contracts/open_ballot/contract.py:415
-    // purge_refund_amount = self.total_cleaned_box_a_ * self.calc_box_storage_mbr() - min_txn_fee.native
-    *
-    intc 4 // 1000
-    -
-    // smart_contracts/open_ballot/contract.py:416-424
-    //   # (0.0169 * 18) ALGO
-    // creator_app_mbr_refund_itxn = itxn.Payment(
+    assert // check self.total_purged_box_a_ exists
+    bz terminate_else_body@3
+    // smart_contracts/open_ballot/contract.py:420-429
+    // # Execute inner transaction payment with purge refund and close remainder
+    // app_balance_refund_itxn = itxn.Payment(
     //     sender=Global.current_application_address,
     //     receiver=Global.creator_address,
-    //     amount=purge_refund_amount,
-    //     fee=min_txn_fee.native,
+    //     amount=self.total_purged_box_a_ * self.calc_box_storage_mbr()
+    //     - min_txn_fee,
+    //     fee=min_txn_fee,
     //     close_remainder_to=Global.creator_address,
-    //     note="Creator claims box storage MBR purge refund.",
+    //     note="Creator gets app base and purged box storage MBR refunded.",
     // ).submit()
     itxn_begin
-    // smart_contracts/open_ballot/contract.py:418
+    // smart_contracts/open_ballot/contract.py:422
     // sender=Global.current_application_address,
     global CurrentApplicationAddress
-    // smart_contracts/open_ballot/contract.py:419
+    // smart_contracts/open_ballot/contract.py:423
     // receiver=Global.creator_address,
     global CreatorAddress
-    // smart_contracts/open_ballot/contract.py:422
+    // smart_contracts/open_ballot/contract.py:424
+    // amount=self.total_purged_box_a_ * self.calc_box_storage_mbr()
+    intc_1 // 0
+    bytec_1 // "total_purged_box_a_"
+    app_global_get_ex
+    assert // check self.total_purged_box_a_ exists
+    callsub calc_box_storage_mbr
+    *
+    // smart_contracts/open_ballot/contract.py:417-418
+    // # Define final app cleanup transaction
+    // min_txn_fee = arc4.UInt16(1000).native  # Minimum acceptable fee for transaction
+    intc_2 // 1000
+    // smart_contracts/open_ballot/contract.py:424-425
+    // amount=self.total_purged_box_a_ * self.calc_box_storage_mbr()
+    // - min_txn_fee,
+    -
+    // smart_contracts/open_ballot/contract.py:427
     // close_remainder_to=Global.creator_address,
-    dup
-    // smart_contracts/open_ballot/contract.py:423
-    // note="Creator claims box storage MBR purge refund.",
-    pushbytes "Creator claims box storage MBR purge refund."
+    global CreatorAddress
+    // smart_contracts/open_ballot/contract.py:428
+    // note="Creator gets app base and purged box storage MBR refunded.",
+    pushbytes "Creator gets app base and purged box storage MBR refunded."
     itxn_field Note
     itxn_field CloseRemainderTo
-    uncover 2
     itxn_field Amount
     itxn_field Receiver
     itxn_field Sender
-    // smart_contracts/open_ballot/contract.py:416-417
-    //   # (0.0169 * 18) ALGO
-    // creator_app_mbr_refund_itxn = itxn.Payment(
+    // smart_contracts/open_ballot/contract.py:420-421
+    // # Execute inner transaction payment with purge refund and close remainder
+    // app_balance_refund_itxn = itxn.Payment(
     intc_0 // pay
     itxn_field TypeEnum
-    // smart_contracts/open_ballot/contract.py:421
-    // fee=min_txn_fee.native,
-    intc 4 // 1000
+    // smart_contracts/open_ballot/contract.py:417-418
+    // # Define final app cleanup transaction
+    // min_txn_fee = arc4.UInt16(1000).native  # Minimum acceptable fee for transaction
+    intc_2 // 1000
     itxn_field Fee
-    // smart_contracts/open_ballot/contract.py:416-424
-    //   # (0.0169 * 18) ALGO
-    // creator_app_mbr_refund_itxn = itxn.Payment(
+    // smart_contracts/open_ballot/contract.py:420-429
+    // # Execute inner transaction payment with purge refund and close remainder
+    // app_balance_refund_itxn = itxn.Payment(
     //     sender=Global.current_application_address,
     //     receiver=Global.creator_address,
-    //     amount=purge_refund_amount,
-    //     fee=min_txn_fee.native,
+    //     amount=self.total_purged_box_a_ * self.calc_box_storage_mbr()
+    //     - min_txn_fee,
+    //     fee=min_txn_fee,
     //     close_remainder_to=Global.creator_address,
-    //     note="Creator claims box storage MBR purge refund.",
+    //     note="Creator gets app base and purged box storage MBR refunded.",
     // ).submit()
     itxn_submit
-    itxn Receiver
     itxn Sender
-    // smart_contracts/open_ballot/contract.py:428
-    // creator_app_mbr_refund_itxn.sender == Global.current_application_address
+    itxn Receiver
+    frame_bury 0
+    b terminate_after_if_else@5
+
+terminate_else_body@3:
+    // smart_contracts/open_ballot/contract.py:431-439
+    // # Execute inner transaction that only closes app remainder balance to the creator
+    // app_balance_refund_itxn = itxn.Payment(
+    //     sender=Global.current_application_address,
+    //     receiver=Global.creator_address,
+    //     amount=UInt64(0),  # Send zero amount
+    //     fee=min_txn_fee,
+    //     close_remainder_to=Global.creator_address,
+    //     note="Creator gets app base MBR refunded.",
+    // ).submit()
+    itxn_begin
+    // smart_contracts/open_ballot/contract.py:433
+    // sender=Global.current_application_address,
+    global CurrentApplicationAddress
+    // smart_contracts/open_ballot/contract.py:434
+    // receiver=Global.creator_address,
+    global CreatorAddress
+    // smart_contracts/open_ballot/contract.py:437
+    // close_remainder_to=Global.creator_address,
+    dup
+    // smart_contracts/open_ballot/contract.py:438
+    // note="Creator gets app base MBR refunded.",
+    pushbytes "Creator gets app base MBR refunded."
+    itxn_field Note
+    itxn_field CloseRemainderTo
+    // smart_contracts/open_ballot/contract.py:435
+    // amount=UInt64(0),  # Send zero amount
+    intc_1 // 0
+    itxn_field Amount
+    itxn_field Receiver
+    itxn_field Sender
+    // smart_contracts/open_ballot/contract.py:431-432
+    // # Execute inner transaction that only closes app remainder balance to the creator
+    // app_balance_refund_itxn = itxn.Payment(
+    intc_0 // pay
+    itxn_field TypeEnum
+    // smart_contracts/open_ballot/contract.py:417-418
+    // # Define final app cleanup transaction
+    // min_txn_fee = arc4.UInt16(1000).native  # Minimum acceptable fee for transaction
+    intc_2 // 1000
+    itxn_field Fee
+    // smart_contracts/open_ballot/contract.py:431-439
+    // # Execute inner transaction that only closes app remainder balance to the creator
+    // app_balance_refund_itxn = itxn.Payment(
+    //     sender=Global.current_application_address,
+    //     receiver=Global.creator_address,
+    //     amount=UInt64(0),  # Send zero amount
+    //     fee=min_txn_fee,
+    //     close_remainder_to=Global.creator_address,
+    //     note="Creator gets app base MBR refunded.",
+    // ).submit()
+    itxn_submit
+    itxn Sender
+    itxn Receiver
+    frame_bury 0
+
+terminate_after_if_else@5:
+    // smart_contracts/open_ballot/contract.py:442
+    // app_balance_refund_itxn.sender == Global.current_application_address
     global CurrentApplicationAddress
     ==
-    // smart_contracts/open_ballot/contract.py:426-429
-    // #  0.4201 ALGO
+    // smart_contracts/open_ballot/contract.py:441-443
     // assert (
-    //     creator_app_mbr_refund_itxn.sender == Global.current_application_address
-    //     ), "Creator app MBR refund itxn sender address must match application address."
-    assert // Creator app MBR refund itxn sender address must match application address.
-    // smart_contracts/open_ballot/contract.py:432
-    // creator_app_mbr_refund_itxn.receiver == Global.creator_address
+    //     app_balance_refund_itxn.sender == Global.current_application_address
+    // ), "app_balance_refund_itxn sender address must match application address."
+    assert // app_balance_refund_itxn sender address must match application address.
+    // smart_contracts/open_ballot/contract.py:446
+    // app_balance_refund_itxn.receiver == Global.creator_address
+    frame_dig 0
     global CreatorAddress
     ==
-    // smart_contracts/open_ballot/contract.py:431-433
+    // smart_contracts/open_ballot/contract.py:445-447
     // assert (
-    //     creator_app_mbr_refund_itxn.receiver == Global.creator_address
-    //     ), "Creator app MBR refund itxn reciever address must match application creator address."
-    assert // Creator app MBR refund itxn reciever address must match application creator address.
-    // smart_contracts/open_ballot/contract.py:435-436
-    // # del self.box_a_voter_data[Global.creator_address]
-    // self.total_cleaned_box_a_= UInt64(0)
-    bytec_2 // "total_cleaned_box_a_"
-    intc_1 // 0
-    app_global_put
+    //     app_balance_refund_itxn.receiver == Global.creator_address
+    // ), "app_balance_refund_itxn_itxn reciever address must match application creator address."
+    assert // app_balance_refund_itxn_itxn reciever address must match application creator address.
     retsub

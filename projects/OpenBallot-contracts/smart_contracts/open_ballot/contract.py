@@ -33,8 +33,7 @@ class OpenBallot(ARC4Contract):
     poll_end_date_unix: UInt64
     poll_finalized: UInt64
 
-    total_box_a_: UInt64
-    total_purged_box_a: UInt64
+    total_purged_box_a_: UInt64
 
     total_choice1: UInt64
     total_choice2: UInt64
@@ -44,6 +43,9 @@ class OpenBallot(ARC4Contract):
     # Initializes the smart contract's box and local storage variables if any
     def __init__(self) -> None:
         super().__init__()
+        # Box Storage type declarations
+        self.box_a_voter_data = BoxMap(Account, VoterData, key_prefix=b"a_")
+
         # Local State type declarations
         # self.local_vote_status = LocalState(
         #     UInt64,
@@ -55,8 +57,6 @@ class OpenBallot(ARC4Contract):
         #     key="vote_choice",
         #     description="Account vote choice (based on UInt64 corresponding w/ choice)",
         # )
-
-        self.box_a_voter_data = BoxMap(Account, VoterData, key_prefix=b"a_")
 
     # Calculate the Global and Local schema minimum balance requirement total cost for the smart contract
     @subroutine
@@ -112,8 +112,8 @@ class OpenBallot(ARC4Contract):
         assert Global.creator_address.balance >= (
             Global.min_balance
             + self.calc_schema_mbr(
-                num_bytes=UInt64(4), num_uint=UInt64(9)
-            )  # Global schema MBR: 0.1 (Global.min_balance) + 0.4565 ALGO (Global schema)
+                num_bytes=UInt64(4), num_uint=UInt64(8)
+            )  # Global schema MBR: 0.1 (Global.min_balance) + 0.428 ALGO (Global schema)
         ), "Application creator address balance must be equal or greater than Global.min_balance + Global schema MBR."
 
         # Initialize Global storage with default value assignments
@@ -124,8 +124,7 @@ class OpenBallot(ARC4Contract):
         self.total_choice3 = UInt64(0)
         self.total_votes = UInt64(0)
 
-        self.total_box_a_ = UInt64(0)
-        self.total_purged_box_a = UInt64(0)
+        self.total_purged_box_a_ = UInt64(0)
 
     # Retrieve the version of the smart contract in an Unix format timestamp
     @arc4.abimethod
@@ -144,7 +143,9 @@ class OpenBallot(ARC4Contract):
         end_date_unix: UInt64,
     ) -> None:
         # Make necessary assertions to verify transaction requirements
-        assert Txn.sender == Global.creator_address, "Only application creator can set up poll."
+        assert (
+            Txn.sender == Global.creator_address
+        ), "Only application creator can set up poll."
 
         assert title.length <= UInt64(
             118
@@ -188,6 +189,7 @@ class OpenBallot(ARC4Contract):
 
         # Finalize poll (ensures poll can only be set once)
         self.poll_finalized = UInt64(1)
+        arc4.BigUIntN()
 
     # Enable application creator to fund App address and covers its Global minimum balance and Box storage MBR
     @arc4.abimethod
@@ -225,8 +227,9 @@ class OpenBallot(ARC4Contract):
         # Check if voter data box doesn't already exist, if not (False) then create new one
         # if not self.box_a_voter_data.maybe(Txn.sender)[1]: <- This works too if copy() used
         if Global.creator_address not in self.box_a_voter_data:
-            self.box_a_voter_data[Global.creator_address] = VoterData(arc4.UInt8(0), arc4.UInt8(0))
-            self.total_box_a_ += UInt64(1)
+            self.box_a_voter_data[Global.creator_address] = VoterData(
+                arc4.UInt8(0), arc4.UInt8(0)
+            )
 
     # Enable any eligible account to request box storage by paying a MBR cost
     @arc4.abimethod
@@ -234,7 +237,7 @@ class OpenBallot(ARC4Contract):
         # Make necessary assertions to verify transaction requirements
         assert (
             Txn.sender != Global.creator_address
-        ),  "Invalid sender address! Application creator address already present in box a_."
+        ), "Invalid sender address! Application creator address can not use request box storage method."
 
         assert (
             Txn.sender not in self.box_a_voter_data
@@ -242,16 +245,15 @@ class OpenBallot(ARC4Contract):
 
         assert (
             mbr_pay.sender not in self.box_a_voter_data
-        ), "Box a_ payment sender address must not be present in box a_."
+        ), "Box storage MBR payment sender address must not be present in box a_."
 
         assert (
             mbr_pay.receiver == Global.current_application_address
-        ), "Box a_ payment reciever address must match application address."
+        ), "Box storage MBR payment reciever address must match application address."
 
         assert (
-            mbr_pay.amount
-            >= self.calc_box_storage_mbr()  # Box a_ fee: 0.0169 ALGO
-        ), "Box a_ payment amount must be equal or greater than box _a fee."
+            mbr_pay.amount >= self.calc_box_storage_mbr()  # Box a_ fee: 0.0169 ALGO
+        ), "Box storage MBR payment amount must be equal or greater than box _a fee."
 
         assert (
             Global.latest_timestamp <= self.poll_end_date_unix
@@ -261,45 +263,6 @@ class OpenBallot(ARC4Contract):
         # if not self.box_a_voter_data.maybe(Txn.sender)[1]: <- This works too if copy() used
         if Txn.sender not in self.box_a_voter_data:
             self.box_a_voter_data[Txn.sender] = VoterData(arc4.UInt8(0), arc4.UInt8(0))
-            self.total_box_a_ += UInt64(1)  # Increment box 'a_' total amount
-
-    # Enable any eligble account to delete their box storage and get their MBR payment refunded
-    @arc4.abimethod
-    def delete_box_storage(self) -> None:
-        # Make necessary assertions to verify transaction requirements
-        assert (
-            Txn.sender != Global.creator_address
-        ),  "Invalid sender address! Application creator must delete smart contract to free up their box storage MBR."
-
-        assert (
-            Txn.sender in self.box_a_voter_data
-        ), "Transaction sender address must be present in box a_."
-
-        # assert (
-        #     Global.latest_timestamp >= self.poll_end_date_unix and
-        #     Global.latest_timestamp <= (self.poll_end_date_unix + UInt64(7 * 24 * 60 * 60))
-        # ), "Box storage can only be deleted within a 7-day window after voting period is over."
-
-        # Submit inner transaction (transaction sender gets their Box storage MBR refunded)
-        box_storage_del_refund_itxn = itxn.Payment(
-            sender=Global.current_application_address,
-            receiver=Txn.sender,
-            amount=self.calc_box_storage_mbr() - arc4.UInt16(1000).native,
-            fee=arc4.UInt16(1000).native,
-            note="Account MBR refund for box storage deletion.",
-        ).submit()
-
-        assert (
-            box_storage_del_refund_itxn.sender == Global.current_application_address
-            ), "box_storage_del_refund_itxn sender address must match application address."
-
-        assert (
-            box_storage_del_refund_itxn.receiver == Txn.sender
-            ), "box_storage_del_refund_itxn reciever address must match transaction sender address."
-
-        # Delete box key (address) from box storage and decrement box 'a_' total amount
-        del self.box_a_voter_data[Txn.sender]
-        self.total_box_a_ -= UInt64(1)
 
     # Enable any eligible account to submit a vote
     @arc4.abimethod
@@ -312,11 +275,16 @@ class OpenBallot(ARC4Contract):
         assert (
             self.box_a_voter_data[Txn.sender].voted,
             self.box_a_voter_data[Txn.sender].choice,
-        ) == (arc4.UInt8(0), arc4.UInt8(0)), "Transaction sender address already submitted a vote."
+        ) == (
+            arc4.UInt8(0),
+            arc4.UInt8(0),
+        ), "Transaction sender address already submitted a vote."
 
-        # assert account.is_opted_in(
-        #     Application(Global.current_application_id.id)
-        # ), "Account must be opted-in before voting."
+        assert (
+            choice == arc4.UInt8(1)
+            or choice == arc4.UInt8(2)
+            or choice == arc4.UInt8(3)
+        ), "Invalid choice. Can only select choices 1, 2, 3."
 
         # assert (
         #     Global.latest_timestamp >= self.poll_start_date_unix
@@ -326,15 +294,13 @@ class OpenBallot(ARC4Contract):
         #     Global.latest_timestamp <= self.poll_end_date_unix
         # ), "Voting period has ended."
 
+        # assert account.is_opted_in(
+        #     Application(Global.current_application_id.id)
+        # ), "Account must be opted-in before voting."
+
         # assert (
         #     self.local_vote_status[account] == UInt64(0) and self.local_vote_choice[account] == UInt64(0)
         # ), "This account already submitted a vote or have not opted-in yet."
-
-        assert (
-            choice == arc4.UInt8(1)
-            or choice == arc4.UInt8(2)
-            or choice == arc4.UInt8(3)
-        ), "Invalid choice. Can only select choices 1, 2, 3."
 
         # self.local_vote_choice[account] = choice  # Set account vote choice (choice selected)
         # self.local_vote_status[account] = UInt64(1)  # Set account vote status (has voted)
@@ -353,6 +319,44 @@ class OpenBallot(ARC4Contract):
         # Increment count for total votes
         self.total_votes += UInt64(1)
 
+    # Enable any eligble account to delete their box storage and get their MBR payment refunded
+    @arc4.abimethod
+    def delete_box_storage(self) -> None:
+        # Make necessary assertions to verify transaction requirements
+        assert (
+            Txn.sender != Global.creator_address
+        ), "Invalid sender address! Application creator must delete smart contract to free up their box storage MBR."
+
+        assert (
+            Txn.sender in self.box_a_voter_data
+        ), "Transaction sender address must be present in box a_."
+
+        # assert (
+        #     Global.latest_timestamp >= self.poll_end_date_unix and
+        #     Global.latest_timestamp <= (self.poll_end_date_unix + UInt64(7 * 24 * 60 * 60))
+        # ), "Box storage can only be deleted within a 7-day window after voting period is over."
+
+        # Delete box key (address) from box storage and decrement box 'a_' total amount
+        del self.box_a_voter_data[Txn.sender]
+
+        # Submit inner transaction (transaction sender gets their Box storage MBR refunded)
+        min_txn_fee = arc4.UInt16(1000).native
+        box_storage_del_refund_itxn = itxn.Payment(
+            sender=Global.current_application_address,
+            receiver=Txn.sender,
+            amount=self.calc_box_storage_mbr() - min_txn_fee,
+            fee=min_txn_fee,
+            note="Account gets app box storage MBR refunded..",
+        ).submit()
+
+        assert (
+            box_storage_del_refund_itxn.sender == Global.current_application_address
+        ), "box_storage_del_refund_itxn sender address must match application address."
+
+        assert (
+            box_storage_del_refund_itxn.receiver == Txn.sender
+        ), "box_storage_del_refund_itxn reciever address must match transaction sender address."
+
     # Enable application creator to execute box storage purge, this deletes any boxes not deleted by other accounts
     @arc4.abimethod  # NOTE: Can also use arc4.StaticArray[arc4.Address, t.Literal[8]] to enforce strict size of 8
     def purge_box_storage(self, box_keys: arc4.DynamicArray[arc4.Address]) -> None:
@@ -366,23 +370,26 @@ class OpenBallot(ARC4Contract):
         # ), "Box storage purge only possible after voting period + 7-day box storage deletion window is over."
 
         assert (
-            box_keys.length <= 8
-        ), "Exceeded upper limit of boxes able to be deleted in a single application call transaction."
+            box_keys.length > 0 and box_keys.length < 9
+        ), "The number of addresses represented by box keys array must be greater than 0 and lesser than 9."
 
         # Iterate through the dynamic array of addresses representing the box key
         for box_key in box_keys:
             # Make necessary assertions to verify transaction requirements
             assert (
                 box_key.native in self.box_a_voter_data
-            ), "Account address represented by box key must be present in box a_."
+            ), "Account address represented in box key must be present in box a_."
 
             assert (
                 box_key.native != Global.creator_address
-            ), "Account address represented by box key must match application creator address."
+            ), "Account address represented in box key must not match application creator address."
 
-            del self.box_a_voter_data[box_key.native]  # Delete box key (address) from box storage
-            self.total_box_a_ -= UInt64(1)  # Decrement box 'a_' total amount
-            self.total_purged_box_a += UInt64(1)  # Increment box 'a_' purged total amount
+            del self.box_a_voter_data[
+                box_key.native
+            ]  # Delete box key (address) from box storage
+            self.total_purged_box_a_ += UInt64(
+                1
+            )  # Increment box 'a_' purged total amount
 
     # Allow application creator to delete the smart contract client, decrease their MBR balance + any remaining box MBR
     @arc4.abimethod(create="disallow", allow_actions=["DeleteApplication"])
@@ -404,28 +411,41 @@ class OpenBallot(ARC4Contract):
         #     Global.latest_timestamp >= (self.poll_end_date_unix + UInt64(7 * 24 * 60 * 60))
         # ), "App can only be deleted after voting period + 7-day box storage deletion window is over."
 
-        del self.box_a_voter_data[Global.creator_address]  # Delete box key (address) from box storage (get 0.0169 ALGO)
-        self.total_box_a_ -= UInt64(1)  # Decrement box 'a_' total amount
+        del self.box_a_voter_data[
+            Global.creator_address
+        ]  # Delete box key (address) from box storage (get 0.0169 ALGO)
 
-        # Submit inner transaction (Creator gets their own + purge box storage MBR refund)
-        box_storage_purge_refund_itxn = itxn.Payment(
-            sender=Global.current_application_address,
-            receiver=Global.creator_address,  # get ((18 * 0.0169) - 0.001) ALGO
-            amount=self.total_purged_box_a * self.calc_box_storage_mbr() - arc4.UInt16(1000).native,
-            fee=arc4.UInt16(1000).native,
-            close_remainder_to=Global.creator_address,  # get 0.1 ALGO
-            note="Creator claims box storage MBR purge refund.",
-        ).submit()
+        # Define final app cleanup transaction
+        min_txn_fee = arc4.UInt16(1000).native  # Minimum acceptable fee for transaction
+        if self.total_purged_box_a_ > UInt64(0):
+            # Execute inner transaction payment with purge refund and close remainder
+            app_balance_refund_itxn = itxn.Payment(
+                sender=Global.current_application_address,
+                receiver=Global.creator_address,
+                amount=self.total_purged_box_a_ * self.calc_box_storage_mbr()
+                - min_txn_fee,
+                fee=min_txn_fee,
+                close_remainder_to=Global.creator_address,
+                note="Creator gets app base and purged box storage MBR refunded.",
+            ).submit()
+        else:
+            # Execute inner transaction that only closes app remainder balance to the creator
+            app_balance_refund_itxn = itxn.Payment(
+                sender=Global.current_application_address,
+                receiver=Global.creator_address,
+                amount=UInt64(0),  # Send zero amount
+                fee=min_txn_fee,
+                close_remainder_to=Global.creator_address,
+                note="Creator gets app base MBR refunded.",
+            ).submit()
 
         assert (
-            box_storage_purge_refund_itxn.sender == Global.current_application_address
-            ), "box_storage_purge_refund_itxn sender address must match application address."
+            app_balance_refund_itxn.sender == Global.current_application_address
+        ), "app_balance_refund_itxn sender address must match application address."
 
         assert (
-            box_storage_purge_refund_itxn.receiver == Global.creator_address
-            ), "box_storage_purge_refund_itxn reciever address must match application creator address."
-
-        self.total_purged_box_a= UInt64(0)
+            app_balance_refund_itxn.receiver == Global.creator_address
+        ), "app_balance_refund_itxn_itxn reciever address must match application creator address."
 
     # Allow any eligible account to opt in to the smart contract's local storage
     # @arc4.abimethod(allow_actions=["OptIn"])
@@ -463,4 +483,3 @@ class OpenBallot(ARC4Contract):
 
     #     # Decrement the total count of accounts that are opted in
     #     self.total_accounts_opted_in -= UInt64(1)
-
