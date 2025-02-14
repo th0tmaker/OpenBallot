@@ -1,15 +1,17 @@
-//./components/JoinApp.tsx
+//./components/deleteApp.tsx
+
 import { consoleLogger } from '@algorandfoundation/algokit-utils/types/logging'
 import { useWallet } from '@txnlab/use-wallet'
 import { useState } from 'react'
 import { AppModalInterface } from '../interfaces/appModal'
 
-const JoinAppModal = ({ algorand, openModal, closeModal, onModalExe }: AppModalInterface) => {
+// Create modal called 'Delete App' with which a smart contract application can be deleted
+const DeleteAppModal = ({ algorand, openModal, closeModal, onModalExe }: AppModalInterface) => {
   const { activeAddress } = useWallet() // Get connected wallet active address
   const [userInputAppId, setUserInputAppId] = useState<string>('') // Store user inputed App ID as str
   const [userMsg, setUserMsg] = useState<string | null>(null) // Define hook for displaying messages to the user
 
-  // Validate App ID user submitted through the Clear State modal
+  // Validate App ID user submitted through the Delete App modal
   const validateUserInputAppId = async () => {
     const appId = BigInt(userInputAppId) // Cast user input App ID into `BigInt` type
 
@@ -28,10 +30,10 @@ const JoinAppModal = ({ algorand, openModal, closeModal, onModalExe }: AppModalI
   }
 
   return (
-    <dialog id="join_app_modal" className={`modal ${openModal ? 'modal-open' : ''}`}>
+    <dialog id="delete_app_modal" className={`modal ${openModal ? 'modal-open' : ''}`}>
       <form method="dialog" className="modal-box rounded-lg p-6 bg-blue-100">
-        <h3 className="text-2xl font-bold">Join Existing App Client</h3>
-        <p className="mt-4 -mb-2">Provide App ID to join an existing poll and vote.</p>
+        <h3 className="text-2xl font-bold">Delete Existing App Client</h3>
+        <p className="mt-4 -mb-2">Provide App ID to delete an existing smart contract.</p>
         <div className="grid m-2 pt-5">
           {activeAddress ? (
             <div className="flex flex-col gap-4">
@@ -47,7 +49,7 @@ const JoinAppModal = ({ algorand, openModal, closeModal, onModalExe }: AppModalI
                 className="btn justify-center rounded-md text-white bg-green-800 hover:bg-green-600 hover:border-black border-black border-2 text-[16px]"
                 onClick={validateUserInputAppId}
               >
-                Join App
+                Delete App
               </button>
               {userMsg && <p className="text-red-700 font-bold">{userMsg}</p>}
             </div>
@@ -71,4 +73,4 @@ const JoinAppModal = ({ algorand, openModal, closeModal, onModalExe }: AppModalI
   )
 }
 
-export default JoinAppModal
+export default DeleteAppModal

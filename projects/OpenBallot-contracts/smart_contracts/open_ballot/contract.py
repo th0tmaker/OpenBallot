@@ -189,7 +189,6 @@ class OpenBallot(ARC4Contract):
 
         # Finalize poll (ensures poll can only be set once)
         self.poll_finalized = UInt64(1)
-        arc4.BigUIntN()
 
     # Enable application creator to fund App address and covers its Global minimum balance and Box storage MBR
     @arc4.abimethod
@@ -384,12 +383,8 @@ class OpenBallot(ARC4Contract):
                 box_key.native != Global.creator_address
             ), "Account address represented in box key must not match application creator address."
 
-            del self.box_a_voter_data[
-                box_key.native
-            ]  # Delete box key (address) from box storage
-            self.total_purged_box_a_ += UInt64(
-                1
-            )  # Increment box 'a_' purged total amount
+            del self.box_a_voter_data[box_key.native]  # Delete box key (address) from box storage
+            self.total_purged_box_a_ += UInt64(1)  # Increment box 'a_' purged total amount
 
     # Allow application creator to delete the smart contract client, decrease their MBR balance + any remaining box MBR
     @arc4.abimethod(create="disallow", allow_actions=["DeleteApplication"])
@@ -411,15 +406,13 @@ class OpenBallot(ARC4Contract):
         #     Global.latest_timestamp >= (self.poll_end_date_unix + UInt64(7 * 24 * 60 * 60))
         # ), "App can only be deleted after voting period + 7-day box storage deletion window is over."
 
-        del self.box_a_voter_data[
-            Global.creator_address
-        ]  # Delete box key (address) from box storage (get 0.0169 ALGO)
+        del self.box_a_voter_data[Global.creator_address]  # Delete box key (address) from box storage (get 0.0169 ALGO)
 
-        # Define final app cleanup transaction
+        # Define final closing app balance refund transaction
         min_txn_fee = arc4.UInt16(1000).native  # Minimum acceptable fee for transaction
         if self.total_purged_box_a_ > UInt64(0):
             # Execute inner transaction payment with purge refund and close remainder
-            app_balance_refund_itxn = itxn.Payment(
+            del_app_refund_itxn = itxn.Payment(
                 sender=Global.current_application_address,
                 receiver=Global.creator_address,
                 amount=self.total_purged_box_a_ * self.calc_box_storage_mbr()
@@ -430,7 +423,7 @@ class OpenBallot(ARC4Contract):
             ).submit()
         else:
             # Execute inner transaction that only closes app remainder balance to the creator
-            app_balance_refund_itxn = itxn.Payment(
+            del_app_refund_itxn = itxn.Payment(
                 sender=Global.current_application_address,
                 receiver=Global.creator_address,
                 amount=UInt64(0),  # Send zero amount
@@ -440,12 +433,12 @@ class OpenBallot(ARC4Contract):
             ).submit()
 
         assert (
-            app_balance_refund_itxn.sender == Global.current_application_address
-        ), "app_balance_refund_itxn sender address must match application address."
+            del_app_refund_itxn.sender == Global.current_application_address
+        ), "del_app_refund_itxn sender address must match application address."
 
         assert (
-            app_balance_refund_itxn.receiver == Global.creator_address
-        ), "app_balance_refund_itxn_itxn reciever address must match application creator address."
+            del_app_refund_itxn.receiver == Global.creator_address
+        ), "del_app_refund_itxn reciever address must match application creator address."
 
     # Allow any eligible account to opt in to the smart contract's local storage
     # @arc4.abimethod(allow_actions=["OptIn"])

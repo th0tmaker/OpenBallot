@@ -7,7 +7,8 @@ import { BtnStateFlags } from '../interfaces/btnState'
 // Default state
 const defautlBtnStates: BtnStateFlags = {
   actionLoading: false,
-  optedIn: false,
+  // optedIn: false,
+  hasBoxStorage: false,
   voteSubmitted: false,
   pollInputsValid: false,
   pollVotingPeriodOpen: false,
@@ -30,14 +31,14 @@ export const checkBtnState = (type: UIButton, flag: BtnStateFlags): boolean => {
   switch (type) {
     case 'create':
       return flag.actionLoading || !flag.pollInputsValid
-    case 'optIn':
-      return flag.actionLoading || flag.optedIn
-    case 'optOut':
-      return flag.actionLoading || !flag.optedIn
+    case 'requestBox':
+      return flag.actionLoading || flag.hasBoxStorage
+    case 'deleteBox':
+      return flag.actionLoading || !flag.hasBoxStorage
     case 'choices':
-      return flag.actionLoading || !flag.optedIn || flag.voteSubmitted || !flag.pollVotingPeriodOpen
+      return flag.actionLoading || !flag.hasBoxStorage || flag.voteSubmitted || !flag.pollVotingPeriodOpen
     case 'submitVote':
-      return flag.actionLoading || !flag.optedIn || flag.voteSubmitted || !flag.pollVotingPeriodOpen
+      return flag.actionLoading || !flag.hasBoxStorage || flag.voteSubmitted || !flag.pollVotingPeriodOpen
     case 'delete':
       return flag.actionLoading
     default:

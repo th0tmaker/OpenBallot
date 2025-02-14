@@ -27,11 +27,9 @@ def algorand() -> AlgorandClient:
 # Update the suggested parameters for Algorand transactions.
 @pytest.fixture(scope="function")
 def sp(algorand: AlgorandClient) -> SuggestedParams:
-    sp = algorand.client.algod.suggested_params()
-    sp.flat_fee = True
-    sp.fee = 1000
-    sp.first = algorand.client.algod.status().get("last-round")
-    sp.last = sp.first + 1000
+    sp = algorand.get_suggested_params()
+    # sp.first = algorand.client.algod.status().get("last-round")
+    # sp.last = sp.first + 1000
     return sp
 
 
@@ -176,13 +174,13 @@ def test_set_poll(
     date_format = "%S/%M/%H/%d/%m/%Y"
 
     # Set start date as str within acceptable params of the smart contract 'set_poll()' abimethod
-    start_date_str = "00/00/00/05/02/2025"  # 00:00:00 on February 5, 2005
+    start_date_str = "00/00/00/10/02/2025"  # 00:00:00 on February 10, 2005
     start_date_unix = int(
         time.mktime(time.strptime(start_date_str, date_format))
     )  # Obtain start date unix via time module by passing the start date string and the date format
 
     # Set enddate as str within acceptable params
-    end_date_str = "00/00/00/18/02/2025"  # 00:00:00 on February 18, 2025
+    end_date_str = "00/00/00/22/02/2025"  # 00:00:00 on February 22, 2025
     end_date_unix = int(
         time.mktime(time.strptime(end_date_str, date_format))
     )  # Obtain end date unix via time module by passing the start date string and the date format
@@ -373,10 +371,9 @@ def test_delete_box_storage(
 
     # Iterate over randy accounts and their app clients (excluding the creator's app client).
     for (randy_name, randy), (app_name, app_client) in zip(
-        randy_factory.items(),
-        list(app_factory.items())[1:],
-        # list(randy_factory.items())[:-1], list(app_factory.items())[1:-1]  # <- leave one randy
-    ):
+        # randy_factory.items(),
+        # list(app_factory.items())[1:],
+        list(randy_factory.items())[:-5], list(app_factory.items())[1:-5]):
         logger.info(
             f"Testing Delete Box Storage abimethod for: {randy_name} using {app_name}"
         )
@@ -452,6 +449,7 @@ def test_purge_box_storage(
 
     # Proccess box keys batches until empty
     while box_key_batches:
+        logger.info(f"Box_key_batches: {box_key_batches}")
         batch = box_key_batches.pop(
             0
         )  # Batch equals first removed index of box keys batches
@@ -459,6 +457,7 @@ def test_purge_box_storage(
 
         # Log
         logger.info(f"Current batch contents in bytes: {batch}")
+
         logger.info(
             f"Total remaining batches left to process: {len(box_key_batches) + 1}"
         )
@@ -474,7 +473,7 @@ def test_purge_box_storage(
                 suggested_params=sp,
                 boxes=[
                     (0, b"a_" + box_key) for box_key in batch
-                ],  # List of tuples w/ App ID  + Box names
+                ],  # List of tuples w/ App ID  + Box key address in batch
             ),
         )
 
@@ -482,17 +481,15 @@ def test_purge_box_storage(
         wait_for_confirmation(algorand.client.algod, purge_box_storage_txn.tx_id, 10)
         assert (
             purge_box_storage_txn.confirmed_round
-        ), f"cleanup_box_storage_txn for box key batch {batch_id} transaction round needs confirmation."
+        ), f"purge_box_storage_txn for box key batch {batch_id} transaction round needs confirmation."
 
-    # Verify transaction was confirmed by the network
-    wait_for_confirmation(algorand.client.algod, purge_box_storage_txn.tx_id, 10)
-    assert (
-        purge_box_storage_txn.confirmed_round
-    ), f"cleanup_box_storage_txn for box key batch {batch_id} transaction round needs confirmation."
+    app_boxes = algorand.client.algod.application_boxes(
+        app_factory["app_client_1"].app_id
+    )
 
     # Log
-    logger.info(f"app boxes array: {app_boxes["boxes"]}")
-    logger.info(f"num of app boxes: {len(app_boxes["boxes"])}")
+    logger.info(f"app boxes array after purge: {app_boxes["boxes"]}")
+    logger.info(f"num of app boxes after purge: {len(app_boxes["boxes"])}")
 
     boxxx0 = base64.b64decode(app_boxes["boxes"][0]["name"])
     # boxxx1 = base64.b64decode(app_boxes["boxes"][1]["name"])
@@ -525,45 +522,45 @@ def test_purge_box_storage(
     )
 
 
-# # Test case: Creator deletes app client (via ["DeleteApplication"] 'terminate' abimethod & gets purged box MBR if any)
-# def test_delete_app(
-#     algorand: AlgorandClient,
-#     sp: SuggestedParams,
-#     app_factory: dict[str, OpenBallotClient],
-#     creator: AddressAndSigner,
-# ) -> None:
+# Test case: Creator deletes app client (via ["DeleteApplication"] 'terminate' abimethod & gets purged box MBR if any)
+def test_delete_app(
+    algorand: AlgorandClient,
+    sp: SuggestedParams,
+    app_factory: dict[str, OpenBallotClient],
+    creator: AddressAndSigner,
+) -> None:
 
-#     # Get creator and app account balances before the delete method is called
-#     creator_before_balance = algorand.account.get_information(creator.address)["amount"]
-#     app_before_balance = algorand.account.get_information(
-#         app_factory["app_client_1"].app_address
-#     )["amount"]
+    # Get creator and app account balances before the delete method is called
+    creator_before_balance = algorand.account.get_information(creator.address)["amount"]
+    app_before_balance = algorand.account.get_information(
+        app_factory["app_client_1"].app_address
+    )["amount"]
 
-#     # Log
-#     logger.info(f"Creator account balance before deletion: {creator_before_balance}")
-#     logger.info(f"App account balance before deletion: {app_before_balance}")
+    # Log
+    logger.info(f"Creator account balance before deletion: {creator_before_balance}")
+    logger.info(f"App account balance before deletion: {app_before_balance}")
 
-#     # Use App client to send a transaction that executes the 'terminate' delete application abimethod
-#     delete_app_client_1_txn = app_factory["app_client_1"].delete_terminate(
-#         transaction_parameters=TransactionParameters(
-#             suggested_params=sp, boxes=[(0, b"a_" + decode_address(creator.address))]
-#         )
-#     )
+    # Use App client to send a transaction that executes the 'terminate' delete application abimethod
+    delete_app_client_1_txn = app_factory["app_client_1"].delete_terminate(
+        transaction_parameters=TransactionParameters(
+            suggested_params=sp, boxes=[(0, b"a_" + decode_address(creator.address))]
+        )
+    )
 
-#     wait_for_confirmation(algorand.client.algod, delete_app_client_1_txn.tx_id, 10)
-#     assert (
-#         delete_app_client_1_txn.confirmed_round
-#     ), "delete_app_client_1_txn transaction round needs confirmation."
+    wait_for_confirmation(algorand.client.algod, delete_app_client_1_txn.tx_id, 10)
+    assert (
+        delete_app_client_1_txn.confirmed_round
+    ), "delete_app_client_1_txn transaction round needs confirmation."
 
-#     # Get creator and app account balance after delete method is called
-#     creator_after_balance = algorand.account.get_information(creator.address)["amount"]
-#     app_after_balance = algorand.account.get_information(
-#         app_factory["app_client_1"].app_address
-#     )["amount"]
+    # Get creator and app account balance after delete method is called
+    creator_after_balance = algorand.account.get_information(creator.address)["amount"]
+    app_after_balance = algorand.account.get_information(
+        app_factory["app_client_1"].app_address
+    )["amount"]
 
-#     # Log
-#     logger.info(f"Creator account balance after deletion: {creator_after_balance}")
-#     logger.info(f"App account balance after deletion: {app_after_balance}")
+    # Log
+    logger.info(f"Creator account balance after deletion: {creator_after_balance}")
+    logger.info(f"App account balance after deletion: {app_after_balance}")
 
 
 # Test case: Account opts in to local storage (via ["OptIn"] using the 'opt_in_local_storage()' abimethod)
