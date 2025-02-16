@@ -13,7 +13,8 @@ export interface AppClientProps {
   pollEndDate: string
   pollStartDateUnix: bigint
   pollEndDateUnix: bigint
-  hasBoxStorage: boolean
+  boxes: string[]
+  // hasBoxStorage: boolean
   // pollVoteStatus: number | null
   // pollVoteChoice: number | null
   // isOptedIn: boolean

@@ -3,18 +3,18 @@
 import { AlgorandClient } from '@algorandfoundation/algokit-utils'
 import { consoleLogger } from '@algorandfoundation/algokit-utils/types/logging'
 import { useWallet } from '@txnlab/use-wallet'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { encodeAddress } from 'algosdk'
+import React, { useCallback, useEffect, useState } from 'react'
 import { AppBaseInfo } from './components/AppBaseInfo'
 import ConnectWallet from './components/ConnectWallet'
-import JoinAppModal from './components/JoinApp'
 import DeleteAppModal from './components/DeleteApp'
+import JoinAppModal from './components/JoinApp'
 import * as iInterface from './interfaces/index'
 import { OpenBallotMethodManager } from './methods'
 import { UISectionState } from './types'
 import * as button from './utils/buttons'
 import * as date from './utils/dates'
 import * as pollInputs from './utils/pollInputs'
-import { encodeAddress } from 'algosdk'
 
 // Algorand client setup
 const algorand = AlgorandClient.defaultLocalNet()
@@ -27,15 +27,16 @@ const Home: React.FC = () => {
   const openBallotMethodManager = new OpenBallotMethodManager(algorand, activeAddress ?? '')
 
   // Modals
-  const [openWalletModal, setOpenWalletModal] = useState(false) // Init ConnectWallet modal and set its starting state as false
-  const [openJoinAppModal, setOpenJoinAppModal] = useState(false) // Init AppJoin modal and set its starting state as false
-  const [openClearStateModal, setOpenClearStateModal] = useState(false) // Init ClearState modal and set its state as false
-
-  const [openDeleteAppModal, setOpenDeleteAppModal] = useState(false) // Init ClearState modal and set its state as false
+  const [modals, setModals] = useState<iInterface.ModalStateFlags>({
+    wallet: false,
+    joinApp: false,
+    deleteApp: false,
+  })
 
   // App Client State
   const [currentAppId, setCurrentAppId] = useState<bigint | null>(null) // Current App ID (for loading App Global State)
   const [currentAppClient, setCurrentAppClient] = useState<iInterface.AppClientProps | null>(null)
+
   // const hasLoadedApp = useRef<{ [key: string]: boolean }>({})
 
   // User Notification
@@ -63,11 +64,32 @@ const Home: React.FC = () => {
   // Button State
   const { btnStates, updateBtnStates } = button.setBtnState() // Set and update the state of buttons
 
-  const prevAppId = useRef<bigint | null>(null)
-
   // ==================================================
   // * EVENT LISTENER (manage lifecycle side-effects) *
   // ==================================================
+
+  // Query App Client Box Storage
+  // useEffect(() => {
+  //   const queryBoxStorage = async () => {
+  //     if (!currentAppId || activeAddress) return
+
+  //     try {
+  //       const appBoxes = await algorand.app.getBoxNames(currentAppId)
+  //       const boxAddresses: string[] = []
+  //       appBoxes.forEach((box) => {
+  //         const boxKey = new Uint8Array(Buffer.from(box.nameBase64.toString(), 'base64'))
+  //         const addr = encodeAddress(boxKey.slice(-32))
+  //         boxAddresses.push(addr)
+  //       })
+  //       setAppBoxes(boxAddresses)
+  //       consoleLogger.info('querry box addrs: ', boxAddresses.toString())
+  //     } catch (error) {
+  //       consoleLogger.error(`Error loading Box Names for App client with ID: ${currentAppId.toString()}!`, error)
+  //     }
+  //   }
+
+  //   queryBoxStorage()
+  // }, [currentAppId, appBoxes.length])
 
   // Checking the validity of user-provided poll inputs
   useEffect(() => {
@@ -83,7 +105,7 @@ const Home: React.FC = () => {
   useEffect(() => {
     const loadGlobalState = async () => {
       // Return and escape if circumstances below
-      if (!currentAppId || !activeAddress) return
+      if (!currentAppId || !activeAddress || activeSection !== 'ENGAGEMENT') return
 
       // Proceed
       try {
@@ -95,8 +117,7 @@ const Home: React.FC = () => {
     }
 
     loadGlobalState() // Call method
-    prevAppId.current = currentAppId // Update the ref with the new value
-  }, [currentAppId, currentAppClient?.hasBoxStorage]) // Trigger effect re-run based on the values of the variables it contains
+  }, [currentAppId, activeSection == 'ENGAGEMENT']) // Trigger effect re-run based on the values of the variables it contains
 
   // Load App Client Local State
   // useEffect(() => {
@@ -159,55 +180,36 @@ const Home: React.FC = () => {
   // * MODAL EVENTS *
   // ================
 
-  // Toggle ConnectWallet Modal State
-  const toggleWalletModal = () => {
-    // Toggle wallet modal between open and not open state
-    setOpenWalletModal((prev) => !prev) // from true to false and vice-versa
+  // Toggle the state of selected modal
 
-    // If 'activeAddress' can be found from wallet (meaning wallet is connected)
-    if (activeAddress) {
-      // Display user message that wallet has been connected successfully
-      setUserMsg({ msg: 'Account address available! Wallet successfully connected.', style: 'text-green-700 font-bold' })
-      // Else, don't display any user message
-    } else {
-      setUserMsg({ msg: '', style: '' })
-    }
-  }
-  // Toggle JoinApp Modal State
-  const toggleJoinAppModal = () => {
-    // Toggle join modal between open and not open state
-    setOpenJoinAppModal((prev) => !prev)
+  const toggleModal = (modal: keyof iInterface.ModalStateFlags, state?: boolean) => {
+    setModals((prev) => ({
+      ...prev,
+      [modal]: state !== undefined ? state : !prev[modal],
+    }))
   }
 
-  // // Toggle ClearState Modal State
-  // const toggleClearStateModal = () => {
-  //   // Toggle clear state modal between open and not open state
-  //   setOpenClearStateModal((prev) => !prev)
-  // }
-
-  // Toggle DeleteApp Modal State
-  const toggleDeleteAppModal = () => {
-    // Toggle clear state modal between open and not open state
-    setOpenDeleteAppModal((prev) => !prev)
-  }
   // Join existing App Client by passing the JoinApp modal App ID
-  const onJoinApp = async (appId: bigint): Promise<boolean | null> => {
+  const handleJoinApp = async (appId: bigint): Promise<boolean | null> => {
     // Check if the active address exists
     if (!activeAddress) {
-      consoleLogger.error('Broke out onJoinApp: activeAddress not found!')
+      consoleLogger.error('Broke out handleJoinApp: activeAddress not found!')
+      setUserMsg({
+        msg: 'Can not proceed without establishing a wallet connection.',
+        style: 'text-red-700 font-bold',
+      })
       return null
     }
 
     try {
-      // Reset the loaded state for this app if we're explicitly joining it
-
       consoleLogger.info(`Joining client with App ID: ${appId.toString()}!`)
 
       // Set appId as 'currentAppId'
       setCurrentAppId(appId) // Pass App ID from JoinApp modal
 
       setActiveSection('ENGAGEMENT') // Switch UI section to engagement
-      setOpenJoinAppModal(false) // Close Join App modal
+
+      toggleModal('joinApp', false) // Close Join App modal
 
       return true // Successfully joined
     } catch (error) {
@@ -243,15 +245,20 @@ const Home: React.FC = () => {
   //   }
   // }
 
-  const onDeleteApp = async (appId: bigint): Promise<boolean | null> => {
+  const handleDeleteApp = async (appId: bigint): Promise<boolean | null> => {
     // Check if the active address exists
     if (!activeAddress) {
-      consoleLogger.error('Broke out onDeleteApp: activeAddress not found!')
+      consoleLogger.error('Broke out handleDeleteApp: activeAddress not found!')
+      setUserMsg({
+        msg: 'No active address found. Check wallet connection.',
+        style: 'text-red-700 font-bold',
+      })
       return null
     }
 
     // Check if the current address matches the creator address before proceeding
-    if (!currentAppClient || currentAppClient.creatorAddress !== activeAddress) {
+    if (currentAppClient?.creatorAddress !== activeAddress) {
+      consoleLogger.error('Broke out handleDeleteApp: currentAppClient.creatorAddress is not equal to activeAddress!')
       setUserMsg({
         msg: 'You are not authorized to delete this app.',
         style: 'text-red-700 font-bold',
@@ -274,7 +281,8 @@ const Home: React.FC = () => {
       setCurrentAppId(null)
       setCurrentAppClient(null)
 
-      setOpenDeleteAppModal(false) // Close Delete App modal
+      toggleModal('deleteApp', false) // Close Delete App modal
+
       return true // Successfully cleared state
     } catch (error) {
       consoleLogger.error(`Error executing Delete App on client with App ID: ${appId.toString()}!`, error)
@@ -324,23 +332,21 @@ const Home: React.FC = () => {
       const pollEndDateStr = date.convertUnixToDate(pollEndDateUnix)
 
       const appBoxes = await algorand.app.getBoxNames(currentAppId)
-
-      let hasBoxStorage = false
+      const boxAddresses: string[] = []
       appBoxes.forEach((box) => {
         const boxKey = new Uint8Array(Buffer.from(box.nameBase64.toString(), 'base64'))
         const addr = encodeAddress(boxKey.slice(-32))
-        consoleLogger.info(`Box Storage for App client with ID: ${currentAppId.toString()} - Box key address: ${addr}`)
+        boxAddresses.push(addr)
+      })
 
-        if (addr === activeAddress) {
-          hasBoxStorage = true
-          consoleLogger.info(addr, 'in', currentAppId.toString())
-        } else {
-          consoleLogger.info(addr, 'NOT in', currentAppId.toString())
-        }
+      // Update the button states based on whether the active address has box storage
+      const hasBoxStorage = boxAddresses.includes(activeAddress ?? '')
+      updateBtnStates({
+        hasBoxStorage,
       })
 
       // Use AppClientProps interface to construct an object representing the new state of the current App Client based on its Global State data
-      const newAppClientState: iInterface.AppClientProps = {
+      const newAppClient: iInterface.AppClientProps = {
         appId: app.appId,
         appAddress: app.appAddress,
         creatorAddress: app.creator,
@@ -350,22 +356,23 @@ const Home: React.FC = () => {
         pollChoice3: String(pollChoice3),
         pollStartDate: pollStartDateStr,
         pollEndDate: pollEndDateStr,
-        pollStartDateUnix,
-        pollEndDateUnix,
-        hasBoxStorage,
+        pollStartDateUnix: pollStartDateUnix,
+        pollEndDateUnix: pollEndDateUnix,
+        boxes: boxAddresses,
         // pollVoteStatus: null,
         // pollVoteChoice: null,
         // isOptedIn: false,
       }
 
       // Set new App client state object as 'currentAppClient'
-      setCurrentAppClient(newAppClientState)
+      setCurrentAppClient(newAppClient)
 
+      consoleLogger.info(newAppClient.boxes.toString())
       consoleLogger.info(`Global State for App client with ID: ${currentAppId.toString()} has been queried successfully!`)
     } catch (error) {
       consoleLogger.error(`Failed to query Global State for App client with ID: ${currentAppId.toString()}!`)
     }
-  }, [activeAddress, currentAppId, algorand.app, setCurrentAppClient])
+  }, [activeAddress, currentAppId, algorand.app])
 
   // Create a method that requests Local State information of an account for a specific client by passing the account address and client App ID through the Algorand client
   const queryLocalState = async (appId: bigint, address: string) => {
@@ -418,9 +425,9 @@ const Home: React.FC = () => {
   }
 
   // Create a new OpenBallot smart contract App client
-  const handleAppLaunch = async () => {
+  const initNewApp = async () => {
     if (!activeAddress) {
-      consoleLogger.error('Broke out handleAppLaunch: activeAddress not found!')
+      consoleLogger.error('Broke out initNewApp: activeAddress not found!')
       setUserMsg({
         msg: 'Account address not found! Please check if your wallet is connected.',
         style: 'text-red-700 font-bold',
@@ -513,7 +520,7 @@ const Home: React.FC = () => {
     })
 
     try {
-      await handleAppLaunch() // Await handleAppLaunch() when Create (Poll) button is clicked
+      await initNewApp() // Await handleAppLaunch() when Create (Poll) button is clicked
       setActiveSection('ENGAGEMENT') // Switch UI section to engagement
     } catch (error) {
       consoleLogger.error('Error with Create (Poll) button click!', error)
@@ -539,8 +546,8 @@ const Home: React.FC = () => {
     setActiveSection('HOME') // set UI section to 'HOME'
 
     // Close any open modals
-    setOpenJoinAppModal(false)
-    setOpenDeleteAppModal(false)
+    toggleModal('joinApp', false) // Close Join App modal
+    toggleModal('deleteApp', false) // Close Delete App modal
 
     // Reset user message panel every time cancel button is clicked
     setUserMsg({
@@ -566,9 +573,9 @@ const Home: React.FC = () => {
         return // Return and break out if user is not authorized to delete currentAppClient
       }
 
-      // Execute smart contract deleteApp method
+      // Execute smart contract purgeBoxStorage method
       consoleLogger.info(`Executing Purge Box Storage on client with App ID: ${currentAppClient.appId.toString()}!`)
-      await openBallotMethodManager.deleteApp(currentAppClient.creatorAddress, currentAppClient.appId)
+      await openBallotMethodManager.purgeBoxStorage(currentAppClient.creatorAddress, currentAppClient.appId)
       consoleLogger.info(`Purge Box Storage method successful on client with App ID: ${currentAppClient.appId.toString()}!`)
 
       // Clear current App Client data
@@ -596,7 +603,7 @@ const Home: React.FC = () => {
   // Execute when Request Box button is clicked
   const onRequestBoxBtnClick = async () => {
     if (!activeAddress) {
-      consoleLogger.error('Broke out onOptInBtnClick: activeAddress not found!')
+      consoleLogger.error('Broke out onRequestBoxBtnClick: activeAddress not found!')
       setUserMsg({
         msg: 'Account address not found! Please check if your wallet is connected.',
         style: 'text-red-700 font-bold',
@@ -1042,12 +1049,17 @@ const Home: React.FC = () => {
                 Start
               </button>
 
-              <button className={button.setBtnStyle('join')} onClick={toggleJoinAppModal}>
+              <button className={button.setBtnStyle('join')} onClick={() => toggleModal('joinApp')}>
                 Join
               </button>
-              <JoinAppModal algorand={algorand} openModal={openJoinAppModal} closeModal={toggleJoinAppModal} onModalExe={onJoinApp} />
+              <JoinAppModal
+                algorand={algorand}
+                openModal={modals.joinApp}
+                closeModal={() => toggleModal('joinApp')}
+                onModalExe={handleJoinApp}
+              />
 
-              <button className={button.setBtnStyle('delete')} onClick={toggleDeleteAppModal}>
+              <button className={button.setBtnStyle('delete')} onClick={() => toggleModal('deleteApp')}>
                 Delete
               </button>
               {/* <ClearStateModal
@@ -1058,14 +1070,14 @@ const Home: React.FC = () => {
               /> */}
               <DeleteAppModal
                 algorand={algorand}
-                openModal={openDeleteAppModal}
-                closeModal={toggleDeleteAppModal}
-                onModalExe={onDeleteApp}
+                openModal={modals.deleteApp}
+                closeModal={() => toggleModal('deleteApp')}
+                onModalExe={handleDeleteApp}
               />
-              <button className={button.setBtnStyle('wallet')} onClick={toggleWalletModal}>
+              <button className={button.setBtnStyle('wallet')} onClick={() => toggleModal('wallet')}>
                 Tekvin
               </button>
-              <ConnectWallet openModal={openWalletModal} closeModal={toggleWalletModal} />
+              <ConnectWallet openModal={modals.wallet} closeModal={() => toggleModal('wallet')} />
             </div>
           )}
           {activeSection === 'CREATION' && (

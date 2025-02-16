@@ -1,8 +1,8 @@
 //src/methods.ts
 
 import { AlgorandClient } from '@algorandfoundation/algokit-utils'
-import { OpenBallotClient, OpenBallotFactory } from './contracts/OpenBallot'
 import { decodeAddress, encodeAddress } from 'algosdk'
+import { OpenBallotClient, OpenBallotFactory } from './contracts/OpenBallot'
 
 /**
  * Class that acts as a wrapper for the OpenBallot smart contract methods, providing an interface
@@ -470,23 +470,22 @@ export class OpenBallotMethodManager {
     })
   }
 
-  async purgeBoxStorage(creator: string, appId: bigint): Promise<Uint8Array[][]> {
+  async purgeBoxStorage(creator: string, appId: bigint) {
     const client = this.getAppClient(appId)
     const appBoxes = await this.algorand.client.algod.getApplicationBoxes(Number(appId)).do()
 
-    // Declare array to hold Uint8Array box keys associated with non-creator addresses
-    const boxKeysAddresses: Uint8Array[] = []
+    // Declare array to hold string box keys associated with non-creator addresses
+    const boxKeysAddresses: string[] = []
     // Iterate over all the boxes retrieved from the algosdk Algod API
     for (const box of appBoxes.boxes) {
       // Ensure the box has a name property
       if (box.name) {
-        // Decode box name value and store it as a Uint8Array representing box key
-        const boxKey = new Uint8Array(Buffer.from(box.name.toString(), 'base64')) // Ensure box.name is type string for Buffer.from
         // Extract last 32 bytes and encode them to get valid Algorand account address in Base32 format
-        const addr = encodeAddress(boxKey.slice(-32))
+        const addr = encodeAddress(box.name.slice(-32))
+        console.log(addr)
         // If address does not match the creator's address, put it in `boxKeysAddresses` array
         if (addr !== creator) {
-          boxKeysAddresses.push(boxKey)
+          boxKeysAddresses.push(addr)
         }
       }
     }
@@ -495,29 +494,37 @@ export class OpenBallotMethodManager {
     const boxKeyBatches: Uint8Array[][] = []
     // Iterate over `boxKeysAddresses` in steps of 8 (i = start index for each batch of 8 box keys)
     for (let i = 0; i < boxKeysAddresses.length; i += 8) {
-      // Slice off 8 elements from `boxKeysAddresses` (start at `i` and end at `i + 8` (or array's ends if fewer than 8 remain)
-      boxKeyBatches.push(boxKeysAddresses.slice(i, i + 8))
+      // Decode addresses and convert them to Uint8Array
+      const batchPromises = boxKeysAddresses.slice(i, i + 8).map(async (key) => {
+        return decodeAddress(key).publicKey
+      })
+
+      // Wait for all promises in the batch to resolve
+      const batch = await Promise.all(batchPromises)
+      console.log(batch)
+      boxKeyBatches.push(batch)
     }
 
-    // While batches in the `boxKeysAddresses` array exist
-    while (boxKeyBatches.length > 0) {
-      const batch = boxKeyBatches.shift() // Batch equals first removed index of box keys batches
+    console.log('box keys batches:', JSON.parse(JSON.stringify(boxKeyBatches)))
 
-      // Proceed only if the batch is not empty
-      if (batch) {
-        const boxNames = batch.map((boxKey) => new Uint8Array([...Buffer.from('a_'), ...boxKey]))
+    // Process batches in parallel
+    await Promise.all(
+      boxKeyBatches.map(async (batch) => {
+        console.log('Processing batch:', batch)
+        // Proceed only if the batch is not empty
+        if (batch) {
+          const boxNames = batch.map((boxKey) => new Uint8Array([...Buffer.from('a_'), ...boxKey]))
 
-        // Send transaction that calls the purgeBoxStorage method and purge current batch of box keys
-        await client.send.purgeBoxStorage({
-          sender: creator,
-          signer: this.getSigner(creator),
-          boxReferences: boxNames.map((name) => ({ appId, name })),
-          args: { boxKeys: batch.map((key) => key.toString()) }, // Pass the batch of box keys as an array of strings
-        })
-      }
-    }
-
-    return boxKeyBatches
+          // Send transaction that calls the purgeBoxStorage method and purge current batch of box keys
+          await client.send.purgeBoxStorage({
+            sender: creator,
+            signer: this.getSigner(creator),
+            boxReferences: boxNames.map((name) => ({ appId, name })),
+            args: { boxKeys: batch.map((key) => encodeAddress(key)) }, // Pass the batch of box keys as an array of strings
+          })
+        }
+      }),
+    )
   }
 
   /**
