@@ -3,8 +3,9 @@
 // Interface type for Button State flags
 export interface BtnStateFlags {
   actionLoading: boolean
-  // optedIn: boolean
+  isCreator: boolean
   hasBoxStorage: boolean
+  ableToPurgeBoxA_: boolean
   voteSubmitted: boolean
   pollInputsValid: boolean
   pollVotingPeriodOpen: boolean

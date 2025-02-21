@@ -1,5 +1,6 @@
 # tests/open_ballot_test.py
 import base64
+import json
 import time
 from itertools import islice
 
@@ -7,6 +8,8 @@ import pytest
 from algokit_utils import TransactionParameters
 from algokit_utils.beta.account_manager import AddressAndSigner
 from algokit_utils.beta.algorand_client import AlgorandClient, SuggestedParams
+from algosdk.abi import Contract
+from algosdk.atomic_transaction_composer import AtomicTransactionComposer
 from algosdk.encoding import decode_address, encode_address
 from algosdk.transaction import wait_for_confirmation
 
@@ -22,15 +25,6 @@ logger = setup_logger()
 @pytest.fixture(scope="session")
 def algorand() -> AlgorandClient:
     return AlgorandClient.default_local_net()
-
-
-# Update the suggested parameters for Algorand transactions.
-@pytest.fixture(scope="function")
-def sp(algorand: AlgorandClient) -> SuggestedParams:
-    sp = algorand.get_suggested_params()
-    # sp.first = algorand.client.algod.status().get("last-round")
-    # sp.last = sp.first + 1000
-    return sp
 
 
 # Create a dispenser account as AddreessAndSigner object that will fund other accounts
@@ -150,84 +144,170 @@ def app_factory(
     return app_clients
 
 
-# Test case: Creator sets poll data (via default ["NoOp"] using the 'set_poll()' abimethod)
-def test_set_poll(
+# Return an ABI compliant Contract object made from the smart contract json file
+@pytest.fixture(scope="session")
+def sc() -> Contract:
+    with open("./smart_contracts/artifacts/open_ballot/OpenBallot.arc32.json") as f:
+        js = json.load(f)
+
+    return Contract.from_json(json.dumps(js["contract"]))
+
+
+# Update the suggested parameters for Algorand transactions.
+@pytest.fixture()
+def sp(algorand: AlgorandClient) -> SuggestedParams:
+    sp = algorand.get_suggested_params()
+    # sp.first = algorand.client.algod.status().get("last-round")
+    # sp.last = sp.first + 1000
+    return sp
+
+# # Test case: Creator sets poll data (via default ["NoOp"] using the 'set_poll()' abimethod)
+# def test_set_poll(
+#     algorand: AlgorandClient,
+#     app_factory: dict[str, OpenBallotClient],
+# ) -> None:
+
+#     # Poll data (title, choice1, choice2, choice3) is algopy.Bytes type and can be passed as byte literals
+#     title = (
+#         b"01234567890123456789012345678901234567890123456789012345678"
+#         b"90123456789012345678901234567890123456789012345678901234567"
+#     )  # 118 bytes in size
+
+#     choice1 = (
+#         b"0123456789012345678901234567890123456789012345678901234567"
+#         b"8901234567890123456789012345678901234567890123456789012345"
+#     )  # 116 bytes in size
+
+#     choice2 = b"Twice"
+#     choice3 = b""
+
+#     # Define date format (second/minute/hour/day/month/year)
+#     date_format = "%S/%M/%H/%d/%m/%Y"
+
+#     # Set start date as str within acceptable params of the smart contract 'set_poll()' abimethod
+#     start_date_str = "00/00/00/16/02/2025"  # 00:00:00 on February 16, 2005
+#     start_date_unix = int(
+#         time.mktime(time.strptime(start_date_str, date_format))
+#     )  # Obtain start date unix via time module by passing the start date string and the date format
+
+#     # Set enddate as str within acceptable params
+#     end_date_str = "00/00/00/28/02/2025"  # 00:00:00 on February 28, 2025
+#     end_date_unix = int(
+#         time.mktime(time.strptime(end_date_str, date_format))
+#     )  # Obtain end date unix via time module by passing the start date string and the date format
+
+#     # Send transaction that calls the set_poll abimethod
+#     set_poll_txn = app_factory["app_client_1"].set_poll(
+#         title=title,
+#         choice1=choice1,
+#         choice2=choice2,
+#         choice3=choice3,
+#         start_date_unix=start_date_unix,
+#         end_date_unix=end_date_unix,
+#         transaction_parameters=TransactionParameters(suggested_params=sp),
+#     )
+
+#     # Verify transaction was confirmed by the network
+#     wait_for_confirmation(algorand.client.algod, set_poll_txn.tx_id, 10)
+#     assert (
+#         set_poll_txn.confirmed_round
+#     ), "set_poll_txn transaction round needs confirmation."
+
+#     # Log
+#     logger.info("SET POLL WAS HERE")
+
+
+# # Test case: Creator funds smart contract address with enough to cover its minimum balance and creator box storage MBR
+# def test_fund_app_mbr(
+#     algorand: AlgorandClient,
+#     app_factory: dict[str, OpenBallotClient],
+#     creator: AddressAndSigner,
+#     sp: SuggestedParams,
+# ) -> None:
+
+#     # Send transaction that calls the fund_app_mbr abimethod
+#     fund_app_mbr_txn = app_factory["app_client_1"].fund_app_mbr(
+#         mbr_pay=setup_stxn(
+#             algorand, creator, app_factory["app_client_1"].app_address, 116_900
+#         ),  # 100_000 (Global.min_balance) + 16_900 (Box fee)
+#         transaction_parameters=TransactionParameters(
+#             suggested_params=sp, boxes=[(0, b"a_" + decode_address(creator.address))]
+#         ),
+#     )
+
+#     # Verify transaction was confirmed by the network
+#     wait_for_confirmation(algorand.client.algod, fund_app_mbr_txn.tx_id, 10)
+#     assert (
+#         fund_app_mbr_txn.confirmed_round
+#     ), "fund_app_mbr_txn transaction round needs confirmation."
+
+#     # Read box storage data
+#     read_box_data(
+#         algorand,
+#         app_factory["app_client_1"].app_id,
+#         b"a_" + decode_address(creator.address),
+#         logger,
+#     )
+
+#     # Log
+#     logger.info(
+#         f"APP CLIENT 1 ID: {app_factory["app_client_1"].app_id}"
+#     )  #  Check client 1 app ID
+#     logger.info(  # Check client 1 Global State
+#         f"App Client 1 Global State: {vars(app_factory["app_client_1"].get_global_state())}"
+#     )
+
+
+# Test case: Add 'set_poll()' & 'fund_app_mbr' into an Atomic Transaction group and send it
+def test_atxn_1(
     algorand: AlgorandClient,
-    app_factory: dict[str, OpenBallotClient],
-) -> None:
-
-    # Poll data (title, choice1, choice2, choice3) is algopy.Bytes type and can be passed as byte literals
-    title = (
-        b"01234567890123456789012345678901234567890123456789012345678"
-        b"90123456789012345678901234567890123456789012345678901234567"
-    )  # 118 bytes in size
-
-    choice1 = (
-        b"0123456789012345678901234567890123456789012345678901234567"
-        b"8901234567890123456789012345678901234567890123456789012345"
-    )  # 116 bytes in size
-
-    choice2 = b"Twice"
-    choice3 = b""
-
-    # Define date format (second/minute/hour/day/month/year)
-    date_format = "%S/%M/%H/%d/%m/%Y"
-
-    # Set start date as str within acceptable params of the smart contract 'set_poll()' abimethod
-    start_date_str = "00/00/00/10/02/2025"  # 00:00:00 on February 10, 2005
-    start_date_unix = int(
-        time.mktime(time.strptime(start_date_str, date_format))
-    )  # Obtain start date unix via time module by passing the start date string and the date format
-
-    # Set enddate as str within acceptable params
-    end_date_str = "00/00/00/22/02/2025"  # 00:00:00 on February 22, 2025
-    end_date_unix = int(
-        time.mktime(time.strptime(end_date_str, date_format))
-    )  # Obtain end date unix via time module by passing the start date string and the date format
-
-    # Send transaction that calls the set_poll abimethod
-    set_poll_txn = app_factory["app_client_1"].set_poll(
-        title=title,
-        choice1=choice1,
-        choice2=choice2,
-        choice3=choice3,
-        start_date_unix=start_date_unix,
-        end_date_unix=end_date_unix,
-    )
-
-    # Verify transaction was confirmed by the network
-    wait_for_confirmation(algorand.client.algod, set_poll_txn.tx_id, 10)
-    assert (
-        set_poll_txn.confirmed_round
-    ), "set_poll_txn transaction round needs confirmation."
-
-    # Log
-    logger.info("SET POLL WAS HERE")
-
-
-# Test case: Creator funds smart contract address with enough to cover its minimum balance and creator box storage MBR
-def test_fund_app_mbr(
-    algorand: AlgorandClient,
-    sp: SuggestedParams,
-    app_factory: dict[str, OpenBallotClient],
     creator: AddressAndSigner,
+    app_factory: dict[str, OpenBallotClient],
+    sp: SuggestedParams,
+    sc: Contract,
 ) -> None:
 
-    # Send transaction that calls the fund_app_mbr abimethod
-    fund_app_mbr_txn = app_factory["app_client_1"].fund_app_mbr(
-        mbr_pay=setup_stxn(
-            algorand, creator, app_factory["app_client_1"].app_address, 116_900
-        ),  # 100_000 (Global.min_balance) + 16_900 (Box fee)
-        transaction_parameters=TransactionParameters(
-            suggested_params=sp, boxes=[(0, b"a_" + decode_address(creator.address))]
+    # Construct new Atomic Transaction from the ATC object
+    atxn = AtomicTransactionComposer()
+
+    # Add 'set_poll()' method via add_method_call to the Atomic Transaction
+    app_factory["app_client_1"].app_client.add_method_call(
+        atxn,
+        sc.get_method_by_name("set_poll"),
+        abi_args={"title": b"MyTitle", "choice1": b"MyChoice1", "choice2": b"MyChoice2",
+         "choice3": b"MyChoice3", "start_date_unix": 1739871607, "end_date_unix": 1740735607},
+        app_id=app_factory["app_client_1"].app_id,
+        parameters=TransactionParameters(
+            suggested_params=sp,
+            note="abi:set_poll",
         ),
     )
 
-    # Verify transaction was confirmed by the network
-    wait_for_confirmation(algorand.client.algod, fund_app_mbr_txn.tx_id, 10)
+    # Add 'fund_app_mbr()' method via add_method_call to the Atomic Transaction
+    app_factory["app_client_1"].app_client.add_method_call(
+        atxn,
+        sc.get_method_by_name("fund_app_mbr"),
+        abi_args={"mbr_pay": setup_stxn(algorand, creator, app_factory[
+        "app_client_1"].app_address, 116_900)},  # 100_000 (Global.min_balance) + 16_900 (Box fee)
+        app_id=app_factory["app_client_1"].app_id,
+        parameters=TransactionParameters(
+            suggested_params=sp,
+            boxes=[(0, b"a_" + decode_address(creator.address))],
+            note="abi:fund_app_mbr"
+        ),
+    )
+
+    # Execute the Atomic Transaction
+    atxn_res = atxn.execute(algorand.client.algod, 2)
+    logger.info(f" Atomic TXN IDS: f{atxn_res.tx_ids}")
+
+    # Verify transactions were confirmed by the network
+    for i in range(len(atxn_res.tx_ids)):
+        wait_for_confirmation(algorand.client.algod, atxn_res.tx_ids[i], 10)
+
     assert (
-        fund_app_mbr_txn.confirmed_round
-    ), "fund_app_mbr_txn transaction round needs confirmation."
+        atxn_res.confirmed_round
+    ), "atxn_res atomic transaction round needs confirmation."
 
     # Read box storage data
     read_box_data(
@@ -272,6 +352,7 @@ def test_request_box_storage(
                 boxes=[
                     (0, b"a_" + decode_address(randy.address))
                 ],  # List referencing App ID and Box name
+                note="abi:request_box_storage",
             ),
         )
 
@@ -317,7 +398,9 @@ def test_submit_vote(
         submit_vote_txn = app_client.submit_vote(
             choice=choice,
             transaction_parameters=TransactionParameters(
-                suggested_params=sp, boxes=[(0, b"a_" + decode_address(voter.address))]
+                suggested_params=sp,
+                boxes=[(0, b"a_" + decode_address(voter.address))],
+                note="abi:submit_vote"
             ),
         )
         wait_for_confirmation(algorand.client.algod, submit_vote_txn.tx_id, 10)
@@ -361,127 +444,140 @@ def test_submit_vote(
     )
 
 
-# Test case: Multiple randy accounts each delete their box storage each and get their paid MBR refunded
-def test_delete_box_storage(
+# # Test case: Multiple randy accounts each delete their box storage each and get their paid MBR refunded
+# def test_delete_box_storage(
+#     algorand: AlgorandClient,
+#     sp: SuggestedParams,
+#     app_factory: dict[str, OpenBallotClient],
+#     randy_factory: dict[str, AddressAndSigner],
+# ) -> None:
+
+#     # Iterate over randy accounts and their app clients (excluding the creator's app client).
+#     for (randy_name, randy), (app_name, app_client) in zip(
+#         # randy_factory.items(),
+#         # list(app_factory.items())[1:],
+#         list(randy_factory.items())[:-5], list(app_factory.items())[1:-5]):
+#         logger.info(
+#             f"Testing Delete Box Storage abimethod for: {randy_name} using {app_name}"
+#         )
+
+#         # Send transaction that calls the delete_box_storage abimethod
+#         del_box_txn = app_client.delete_box_storage(
+#             transaction_parameters=TransactionParameters(
+#                 suggested_params=sp,
+#                 boxes=[
+#                     (0, b"a_" + decode_address(randy.address))
+#                 ],  # List referencing App ID and Box name
+#             ),  note = "abi:delete_box_storage",
+#         )
+
+#         # Verify transaction was confirmed by the network
+#         wait_for_confirmation(algorand.client.algod, del_box_txn.tx_id, 10)
+#         assert (
+#             del_box_txn.confirmed_round
+#         ), "del_box_txn transaction round needs confirmation."
+
+#     # Log
+#     app_boxes = algorand.client.algod.application_boxes(
+#         app_factory["app_client_1"].app_id
+#     )
+#     logger.info(f"app boxes array: {app_boxes["boxes"]}")
+#     logger.info(f"num of app boxes: {len(app_boxes["boxes"])}")
+
+#     logger.info(
+#         f"APP CLIENT 1 ID: {app_factory["app_client_1"].app_id}"
+#     )  #  Check client 1 app ID
+#     logger.info(  # Check client 1 Global State
+#         f"App Client 1 Global State: {vars(app_factory["app_client_1"].get_global_state())}"
+#     )
+
+
+# Test case: Add 'purge_box_storage()' into Atomic Transaction groups and send them
+def test_purge_box_stroage_atxns(
     algorand: AlgorandClient,
-    sp: SuggestedParams,
-    app_factory: dict[str, OpenBallotClient],
-    randy_factory: dict[str, AddressAndSigner],
-) -> None:
-
-    # Iterate over randy accounts and their app clients (excluding the creator's app client).
-    for (randy_name, randy), (app_name, app_client) in zip(
-        # randy_factory.items(),
-        # list(app_factory.items())[1:],
-        list(randy_factory.items())[:-5], list(app_factory.items())[1:-5]):
-        logger.info(
-            f"Testing Delete Box Storage abimethod for: {randy_name} using {app_name}"
-        )
-
-        # Send transaction that calls the delete_box_storage abimethod
-        del_box_txn = app_client.delete_box_storage(
-            transaction_parameters=TransactionParameters(
-                suggested_params=sp,
-                boxes=[
-                    (0, b"a_" + decode_address(randy.address))
-                ],  # List referencing App ID and Box name
-            ),
-        )
-
-        # Verify transaction was confirmed by the network
-        wait_for_confirmation(algorand.client.algod, del_box_txn.tx_id, 10)
-        assert (
-            del_box_txn.confirmed_round
-        ), "del_box_txn transaction round needs confirmation."
-
-    # Log
-    app_boxes = algorand.client.algod.application_boxes(
-        app_factory["app_client_1"].app_id
-    )
-    logger.info(f"app boxes array: {app_boxes["boxes"]}")
-    logger.info(f"num of app boxes: {len(app_boxes["boxes"])}")
-
-    logger.info(
-        f"APP CLIENT 1 ID: {app_factory["app_client_1"].app_id}"
-    )  #  Check client 1 app ID
-    logger.info(  # Check client 1 Global State
-        f"App Client 1 Global State: {vars(app_factory["app_client_1"].get_global_state())}"
-    )
-
-
-# Test case: Creator executes box storage purge (NOTE: Refactor to search boxes by indexer instead of looping randies)
-def test_purge_box_storage(
-    algorand: AlgorandClient,
-    sp: SuggestedParams,
     creator: AddressAndSigner,
     app_factory: dict[str, OpenBallotClient],
+    sp: SuggestedParams,
+    sc: Contract,
 ) -> None:
 
-    logger.info("Testing Purge Box Storage abimethod:")
-
+    # Get an array of all boxes in application with given ID
     app_boxes = algorand.client.algod.application_boxes(
         app_factory["app_client_1"].app_id
     )
 
-    # Log
-    logger.info(f"app boxes array: {app_boxes["boxes"]}")
-    logger.info(f"num of app boxes: {len(app_boxes["boxes"])}")
-
-    # Prepare randy addresses list by decoding box names and extracting last 32 bytes
-    randy_addresses = []
+    # Iterate through all boxes in application and extract the address value from box name field
+    box_addresses = []  # Define a list to store extracted addresses
     for box in app_boxes["boxes"]:
-        box_key = base64.b64decode(box["name"])
-        address = encode_address(box_key[-32:])
-        if address != creator.address:
-            randy_addresses.append(address)
+        box_key = base64.b64decode(box["name"])  # Decode the base64 encoded box name value to get box key
+        address = encode_address(box_key[-32:])  # Last 32 bytes of box key value is address (rest is key prefix)
 
-    # Prepare box keys in batches
-    box_key_batches = [
+        # If address from box key matches creator address, do NOT append it
+        if address != creator.address:
+            box_addresses.append(address)
+
+    # Define list that will store other lists, each representing a batch of box keys in byte format
+    bk_batches = [
         [
-            decode_address(randy_address)
-            for randy_address in islice(randy_addresses, i, i + 8)
+            # This represents a batch list // Output: [addr1, addr2, addr3, addr4, addr5, addr6, addr7, addr8]
+            decode_address(address)  # Decode the address
+            for address in islice(box_addresses, i, i + 8)  # Slice first 8 incidies of box addresses
         ]
-        for i in range(0, len(randy_addresses), 8)
+        # Iterate through box addresses indicies in steps of 8
+        for i in range(0, len(box_addresses), 8)  # Output: 0, 8, 16,
     ]
 
-    # Track num of total batches
-    box_keys_batch_count = len(box_key_batches)
+    # Create a new ATC object for every two batches of box keys and store it in a dict
+    atxn_factory = {f"atxn_{i + 1}": AtomicTransactionComposer() for i in range((len(bk_batches) + 1) // 2)}
+    batch_counter = 0  # Initialize batch count
 
-    # Proccess box keys batches until empty
-    while box_key_batches:
-        logger.info(f"Box_key_batches: {box_key_batches}")
-        batch = box_key_batches.pop(
-            0
-        )  # Batch equals first removed index of box keys batches
-        batch_id = box_keys_batch_count - len(box_key_batches)
+    # Loop until no more batches of box keys in bk_batches
+    while bk_batches:
+        # Pop first element of bk_batches (list[bytes]), this represents current batch of box keys
+        bk_batch = bk_batches.pop(0)
 
-        # Log
-        logger.info(f"Current batch contents in bytes: {batch}")
+        # Define atxn ID for the key of the app_factory dict in order to shift to new AtomicTransactionComposer() object
+        atxn_id = (batch_counter // 2) + 1  # Every two batches, atxn_id increases by 1
 
-        logger.info(
-            f"Total remaining batches left to process: {len(box_key_batches) + 1}"
-        )
-        logger.info(
-            f"Total remaining boxes left to process: {sum(len(b) for b in box_key_batches) + len(batch)}"
-        )
-        logger.info(f"Processing box key batch: {batch_id}/{box_keys_batch_count}")
+        logger.info(f"bk_batch: {bk_batch}")
+        logger.info(f"atxn_id: {atxn_id}")
 
-        # Send transaction that calls the purge_box_storage abimethod
-        purge_box_storage_txn = app_factory["app_client_1"].purge_box_storage(
-            box_keys=batch,
-            transaction_parameters=TransactionParameters(
-                suggested_params=sp,
-                boxes=[
-                    (0, b"a_" + box_key) for box_key in batch
-                ],  # List of tuples w/ App ID  + Box key address in batch
+        # Add method call to the atxn in app_factory under the key specific tied to atxn_id
+        app_factory["app_client_1"].app_client.add_method_call(
+            atxn_factory[f"atxn_{atxn_id}"],  # Access atxn under app_factory key
+            sc.get_method_by_name("purge_box_storage"), # Get (ABI)Method by name
+            abi_args={"box_keys": bk_batch},  # Pass current individual batch of box keys as arg
+            app_id=app_factory["app_client_1"].app_id,  # Reference client by App ID
+            parameters=TransactionParameters(
+                suggested_params=sp,  # Pass fresh suggested params
+                boxes=[(0, b"a_" + box_key) for box_key in bk_batch],  # Ref each box name in batch
+                note="abi:purge_box_storage",
             ),
         )
 
-        # Verify transaction was confirmed by the network
-        wait_for_confirmation(algorand.client.algod, purge_box_storage_txn.tx_id, 10)
-        assert (
-            purge_box_storage_txn.confirmed_round
-        ), f"purge_box_storage_txn for box key batch {batch_id} transaction round needs confirmation."
+        # Execute Atomic transactions
+        # If batch counter is odd or bk_batch is empty (meaning last array is being proccessed)
+        if batch_counter % 2 == 1 or len(bk_batches) == 0:
+            logger.info(f"Executing atxn {atxn_id}")
+            atxn_res = atxn_factory[f"atxn_{atxn_id}"].execute(algorand.client.algod, 2)
+
+            # Wait for confirmations (confirm for every txn id in atxn)
+            for tx_id in atxn_res.tx_ids:
+                wait_for_confirmation(algorand.client.algod, tx_id, 10)
+
+            # Ensure the atxn response atomic transaction was confirmed by network
+            assert atxn_res.confirmed_round, "atxn_res atomic transaction round needs confirmation."
+
+        # Increment batch counter by 1 (signals next batch is being processed)
+        batch_counter += 1
+
+    # Log
+    logger.info(
+        f"APP CLIENT 1 ID: {app_factory['app_client_1'].app_id}"
+    )  #  Check client 1 app ID
+    logger.info(  # Check client 1 Global State
+        f"App Client 1 Global State: {vars(app_factory['app_client_1'].get_global_state())}"
+    )
 
     app_boxes = algorand.client.algod.application_boxes(
         app_factory["app_client_1"].app_id
@@ -490,36 +586,6 @@ def test_purge_box_storage(
     # Log
     logger.info(f"app boxes array after purge: {app_boxes["boxes"]}")
     logger.info(f"num of app boxes after purge: {len(app_boxes["boxes"])}")
-
-    boxxx0 = base64.b64decode(app_boxes["boxes"][0]["name"])
-    # boxxx1 = base64.b64decode(app_boxes["boxes"][1]["name"])
-    # boxxx2 = base64.b64decode(app_boxes["boxes"][2]["name"])
-    logger.info(boxxx0)
-    logger.info(encode_address(boxxx0[-32:]))
-    # logger.info(encode_address(boxxx1[-32:]))
-    # logger.info(encode_address(boxxx2[-32:]))
-
-    # boxxx = algorand.client.algod.application_box_by_name(app_factory["app_client_1"].app_id, box_title)
-
-    # box_title = base64.b64decode(box["name"])
-    # box_value = list(base64.b64decode(box["value"]))
-
-    # #[-2-32:-2]
-    # if len(box_title[-32:]) == 32:
-    #     addr_base32 = encode_address(box_title[-32:])
-    #     logger.info(
-    #         f"Address: {addr_base32} using box with key prefix: {box_title[:-32]}"
-    #     )
-
-    # logger.info(f"Address: {addr_base32} - VoterData.voted: {box_value[0]}")
-    # logger.info(f"Address: {addr_base32} - VoterData.choice: {box_value[1]}")
-
-    logger.info(
-        f"APP CLIENT 1 ID: {app_factory["app_client_1"].app_id}"
-    )  #  Check client 1 app ID
-    logger.info(  # Check client 1 Global State
-        f"App Client 1 Global State: {vars(app_factory["app_client_1"].get_global_state())}"
-    )
 
 
 # Test case: Creator deletes app client (via ["DeleteApplication"] 'terminate' abimethod & gets purged box MBR if any)

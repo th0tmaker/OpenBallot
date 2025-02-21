@@ -1,7 +1,7 @@
 //src/methods.ts
 
 import { AlgorandClient } from '@algorandfoundation/algokit-utils'
-import { decodeAddress, encodeAddress } from 'algosdk'
+import { AtomicTransactionComposer, decodeAddress, encodeAddress, ABIMethod } from 'algosdk'
 import { OpenBallotClient, OpenBallotFactory } from './contracts/OpenBallot'
 
 /**
@@ -370,6 +370,65 @@ export class OpenBallotMethodManager {
     })
   }
 
+  async setPollFundAppMbrAtxn(
+    creator: string,
+    appId: bigint,
+    title: string,
+    choice1: string,
+    choice2: string,
+    choice3: string,
+    startDateUnix: bigint,
+    endDateUnix: bigint,
+  ) {
+    const client = this.getAppClient(appId)
+    const appID = Number(appId)
+
+    const atxn = new AtomicTransactionComposer()
+
+    // Define the MBR payment transaction
+    const mbrPay = await this.algorand.createTransaction.payment({
+      sender: creator,
+      signer: this.getSigner(creator),
+      receiver: client.appAddress,
+      amount: (116_900).microAlgos(), // App Global.minBalance + BoxStorageMBR
+      note: 'abi:fund_app_mbr(mbr_payment).',
+    })
+
+    atxn.addMethodCall({
+      appID: appID,
+      method: ABIMethod.fromSignature(client.appClient.getABIMethod('set_poll').getSignature()),
+      methodArgs: [
+        new TextEncoder().encode(title),
+        new TextEncoder().encode(choice1),
+        new TextEncoder().encode(choice2),
+        new TextEncoder().encode(choice3),
+        startDateUnix,
+        endDateUnix,
+      ],
+      sender: creator,
+      suggestedParams: await this.algorand.getSuggestedParams(),
+      note: new Uint8Array(Buffer.from('abi:set_poll')),
+      signer: this.getSigner(creator),
+    })
+
+    atxn.addMethodCall({
+      appID: appID,
+      method: ABIMethod.fromSignature(client.appClient.getABIMethod('fund_app_mbr').getSignature()),
+      methodArgs: [{ txn: mbrPay, signer: this.getSigner(creator) }],
+      sender: creator,
+      suggestedParams: await this.algorand.getSuggestedParams(),
+      boxes: [{ appIndex: appID, name: this.getBoxName(creator) }],
+      note: new Uint8Array(Buffer.from('abi:fund_app_mbr')),
+      signer: this.getSigner(creator),
+    })
+
+    const atxnRes = atxn.execute(this.algorand.client.algod, 2)
+
+    if (!(await atxnRes).confirmedRound) {
+      throw new Error('atxn_res atomic transaction round needs confirmation.')
+    }
+  }
+
   /**
    * Request box storage for the application (appId) specified by its unique identifier.
    *
@@ -452,6 +511,7 @@ export class OpenBallotMethodManager {
     await client.send.submitVote({
       sender, // The address of the account submitting the vote.
       signer: this.getSigner(sender), // The signer for the sender's transactions.
+      boxReferences: [{ appId, name: this.getBoxName(sender) }],
       args: {
         choice, // The sender's selected choice for the vote.
       },
@@ -470,6 +530,82 @@ export class OpenBallotMethodManager {
     })
   }
 
+  async purgeBoxStorageAtxn(creator: string, appId: bigint) {
+    const client = this.getAppClient(appId)
+    const appID = Number(appId)
+    const appBoxes = await this.algorand.client.algod.getApplicationBoxes(appID).do()
+
+    const boxKeysAddresses: string[] = []
+    for (const box of appBoxes.boxes) {
+      if (box.name) {
+        const address = encodeAddress(box.name.slice(-32))
+        if (address != creator) {
+          boxKeysAddresses.push(address)
+        }
+      }
+    }
+
+    const boxKeyBatches: Uint8Array[][] = []
+    for (let i = 0; i < boxKeysAddresses.length; i += 8) {
+      const batchPromises = boxKeysAddresses.slice(i, i + 8).map(async (key) => {
+        return decodeAddress(key).publicKey
+      })
+
+      // Wait for all promises in the batch to resolve
+      const batch = await Promise.all(batchPromises)
+      boxKeyBatches.push(batch)
+    }
+
+    console.log('boxkey batches', boxKeyBatches)
+
+    const atxnFactory: { [key: string]: AtomicTransactionComposer } = {}
+    const numComposers = Math.floor((boxKeyBatches.length + 1) / 2)
+    for (let i = 0; i < numComposers; i++) {
+      atxnFactory[`atxn_${i + 1}`] = new AtomicTransactionComposer()
+    }
+
+    // Process batches in parallel
+    await Promise.all(
+      boxKeyBatches.map(async (batch, index) => {
+        console.log('boxkey batches2', boxKeyBatches)
+        console.log('batch', batch)
+        const atxnId = Math.floor(index / 2 + 1)
+        // (batch_counter // 2) + 1
+        console.log('atxn ID: ', atxnId)
+        // Proceed only if the batch is not empty
+        while (batch) {
+          const boxNames = batch.map((boxKey) => new Uint8Array([...Buffer.from('a_'), ...boxKey]))
+          console.log('box names', boxNames)
+          atxnFactory[`atxn_${atxnId}`].addMethodCall({
+            appID: appID,
+            method: ABIMethod.fromSignature(client.appClient.getABIMethod('purge_box_storage').getSignature()),
+            methodArgs: [batch],
+            sender: creator,
+            suggestedParams: await this.algorand.getSuggestedParams(),
+            boxes: boxNames.map((name) => ({ appIndex: appID, name })),
+            note: new Uint8Array(Buffer.from('abi:purge_box_storage')),
+            signer: this.getSigner(creator),
+          })
+
+          if (index % 2 == 1 || index === boxKeyBatches.length - 1) {
+            const atxnRes = await atxnFactory[`atxn_${atxnId}`].execute(this.algorand.client.algod, 2)
+
+            if (!atxnRes.confirmedRound) {
+              throw new Error('atxn_res atomic transaction round needs confirmation.')
+            }
+          }
+
+          console.log('konec')
+          // if batch_counter % 2 == 1 or len(bk_batches) == 0:
+          // logger.info(f"Executing atxn {atxn_id}")
+          // atxn_res = atxn_factory[f"atxn_{atxn_id}"].execute(algorand.client.algod, 2)
+
+          // Send transaction that calls the purgeBoxStorage method and purge current batch of box keys
+        }
+      }),
+    )
+  }
+
   async purgeBoxStorage(creator: string, appId: bigint) {
     const client = this.getAppClient(appId)
     const appBoxes = await this.algorand.client.algod.getApplicationBoxes(Number(appId)).do()
@@ -481,11 +617,10 @@ export class OpenBallotMethodManager {
       // Ensure the box has a name property
       if (box.name) {
         // Extract last 32 bytes and encode them to get valid Algorand account address in Base32 format
-        const addr = encodeAddress(box.name.slice(-32))
-        console.log(addr)
+        const address = encodeAddress(box.name.slice(-32))
         // If address does not match the creator's address, put it in `boxKeysAddresses` array
-        if (addr !== creator) {
-          boxKeysAddresses.push(addr)
+        if (address !== creator) {
+          boxKeysAddresses.push(address)
         }
       }
     }
@@ -501,16 +636,12 @@ export class OpenBallotMethodManager {
 
       // Wait for all promises in the batch to resolve
       const batch = await Promise.all(batchPromises)
-      console.log(batch)
       boxKeyBatches.push(batch)
     }
-
-    console.log('box keys batches:', JSON.parse(JSON.stringify(boxKeyBatches)))
 
     // Process batches in parallel
     await Promise.all(
       boxKeyBatches.map(async (batch) => {
-        console.log('Processing batch:', batch)
         // Proceed only if the batch is not empty
         if (batch) {
           const boxNames = batch.map((boxKey) => new Uint8Array([...Buffer.from('a_'), ...boxKey]))
@@ -562,35 +693,36 @@ export class OpenBallotMethodManager {
       method: 'terminate', // The ABI method name for creating the application.
     })
   }
-
-  /**
-   * Clears the local state associated with the given application (appId) for the specified sender account.
-   *
-   * This method uses the application client (`getAppClient`) to send a `clearState` transaction.
-   * Clearing the local state allows the sender to reclaim the Minimum Balance Requirement (MBR) associated with
-   * the application's local state from their account, effectively removing any application-specific data stored for them.
-   *
-   * @param sender - The address of the account that is clearing the local state for the specified application.
-   * @param appId - The unique identifier of the application whose local state is being cleared for the sender.
-   *
-   * Steps:
-   * 1. Retrieve the application client for the specified appId using `getAppClient`.
-   * 2. Send a `clearState` transaction using the sender's account, which:
-   *    - Removes the application's local state data from the sender's account.
-   *    - Frees up the associated MBR, reducing the sender's minimum balance requirement.
-   */
-  async clearState(sender: string, appId: bigint) {
-    // Retrieve the application client for the specified application ID.
-    const client = this.getAppClient(appId)
-
-    // Send the clearState transaction using the specified sender's address.
-    await client.send.clearState({
-      sender, // Sender account clears the local state for the application.
-      signer: this.getSigner(sender), // The signer for the sender's transactions.
-    })
-  }
 }
 
+/**
+ * Clears the local state associated with the given application (appId) for the specified sender account.
+ *
+ * This method uses the application client (`getAppClient`) to send a `clearState` transaction.
+ * Clearing the local state allows the sender to reclaim the Minimum Balance Requirement (MBR) associated with
+ * the application's local state from their account, effectively removing any application-specific data stored for them.
+ *
+ * @param sender - The address of the account that is clearing the local state for the specified application.
+ * @param appId - The unique identifier of the application whose local state is being cleared for the sender.
+ *
+ * Steps:
+ * 1. Retrieve the application client for the specified appId using `getAppClient`.
+ * 2. Send a `clearState` transaction using the sender's account, which:
+ *    - Removes the application's local state data from the sender's account.
+ *    - Frees up the associated MBR, reducing the sender's minimum balance requirement.
+ */
+// async clearState(sender: string, appId: bigint) {
+//   // Retrieve the application client for the specified application ID.
+//   const client = this.getAppClient(appId)
+
+//   // Send the clearState transaction using the specified sender's address.
+//   await client.send.clearState({
+//     sender, // Sender account clears the local state for the application.
+//     signer: this.getSigner(sender), // The signer for the sender's transactions.
+//   })
+// }
+
+//
 // /**
 //  * Opts the sender account into the application's local storage (appId).
 //  *

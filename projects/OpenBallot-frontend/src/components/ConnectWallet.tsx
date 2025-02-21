@@ -16,13 +16,11 @@ const ConnectWallet = ({ openModal, closeModal }: ConnectWalletInterface) => {
   const [userInputAddr, setUserInputAddr] = useState<string>('')
 
   // Ensure the wallet is disconnected on page refresh or close
-  // useEffect(() => {
-  //   if (!openModal) {
-  //     localStorage.removeItem('txnlab-use-wallet') // Disconnect the active wallet account when the modal closes
-  //   }
-  //   consoleLogger.info('Active address:', activeAddress)
-  //   consoleLogger.info('Connected Accounts:', connectedAccounts)
-  // }, [])
+  useEffect(() => {
+    if (!openModal) {
+      localStorage.removeItem('txnlab-use-wallet') // Disconnect the active wallet account when the modal closes
+    }
+  }, [openModal])
 
   const changeActiveAccountToNextIndex = async (provider: Provider) => {
     try {

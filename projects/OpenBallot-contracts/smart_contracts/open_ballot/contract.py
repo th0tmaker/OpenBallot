@@ -38,7 +38,7 @@ class OpenBallot(ARC4Contract):
     total_choice1: UInt64
     total_choice2: UInt64
     total_choice3: UInt64
-    total_votes: UInt64
+
 
     # Initializes the smart contract's box and local storage variables if any
     def __init__(self) -> None:
@@ -58,6 +58,7 @@ class OpenBallot(ARC4Contract):
         #     description="Account vote choice (based on UInt64 corresponding w/ choice)",
         # )
 
+
     # Calculate the Global and Local schema minimum balance requirement total cost for the smart contract
     @subroutine
     def calc_schema_mbr(self, num_bytes: UInt64, num_uint: UInt64) -> UInt64:
@@ -74,6 +75,7 @@ class OpenBallot(ARC4Contract):
         # Return the minimum balance requirement total cost
         return base_fee + total_byte_fee + total_uint_fee
 
+
     # Calculate box fee for single box unit
     @subroutine
     def calc_single_box_fee(
@@ -89,6 +91,7 @@ class OpenBallot(ARC4Contract):
         # Return single box fee
         return base_fee.native + size_fee
 
+
     # Calculate the Box storage minimum balance requirement total cost for the smart contract
     @subroutine
     def calc_box_storage_mbr(self) -> UInt64:
@@ -101,6 +104,7 @@ class OpenBallot(ARC4Contract):
         # Return the minimum balance requirement total cost
         return box_a_
 
+
     # Call the 'Create' abimethod that generates the smart contract client and initializes global storage int variables
     @arc4.abimethod(create="require")
     def generate(self) -> None:
@@ -112,8 +116,8 @@ class OpenBallot(ARC4Contract):
         assert Global.creator_address.balance >= (
             Global.min_balance
             + self.calc_schema_mbr(
-                num_bytes=UInt64(4), num_uint=UInt64(8)
-            )  # Global schema MBR: 0.1 (Global.min_balance) + 0.428 ALGO (Global schema)
+                num_bytes=UInt64(4), num_uint=UInt64(7)
+            )  # Global schema MBR: 0.1 (Global.min_balance) + 0.3995 ALGO (Global schema)
         ), "Application creator address balance must be equal or greater than Global.min_balance + Global schema MBR."
 
         # Initialize Global storage with default value assignments
@@ -122,14 +126,15 @@ class OpenBallot(ARC4Contract):
         self.total_choice1 = UInt64(0)
         self.total_choice2 = UInt64(0)
         self.total_choice3 = UInt64(0)
-        self.total_votes = UInt64(0)
 
         self.total_purged_box_a_ = UInt64(0)
+
 
     # Retrieve the version of the smart contract in an Unix format timestamp
     @arc4.abimethod
     def get_version_unix(self) -> UInt64:
         return TemplateVar[UInt64]("VERSION_UNIX")
+
 
     # Enable application creator to set up poll data values including title, choices, and dates
     @arc4.abimethod
@@ -190,6 +195,7 @@ class OpenBallot(ARC4Contract):
         # Finalize poll (ensures poll can only be set once)
         self.poll_finalized = UInt64(1)
 
+
     # Enable application creator to fund App address and covers its Global minimum balance and Box storage MBR
     @arc4.abimethod
     def fund_app_mbr(self, mbr_pay: gtxn.PaymentTransaction) -> None:
@@ -230,6 +236,7 @@ class OpenBallot(ARC4Contract):
                 arc4.UInt8(0), arc4.UInt8(0)
             )
 
+
     # Enable any eligible account to request box storage by paying a MBR cost
     @arc4.abimethod
     def request_box_storage(self, mbr_pay: gtxn.PaymentTransaction) -> None:
@@ -262,6 +269,7 @@ class OpenBallot(ARC4Contract):
         # if not self.box_a_voter_data.maybe(Txn.sender)[1]: <- This works too if copy() used
         if Txn.sender not in self.box_a_voter_data:
             self.box_a_voter_data[Txn.sender] = VoterData(arc4.UInt8(0), arc4.UInt8(0))
+
 
     # Enable any eligible account to submit a vote
     @arc4.abimethod
@@ -315,8 +323,6 @@ class OpenBallot(ARC4Contract):
         else:
             self.total_choice3 += UInt64(1)
 
-        # Increment count for total votes
-        self.total_votes += UInt64(1)
 
     # Enable any eligble account to delete their box storage and get their MBR payment refunded
     @arc4.abimethod
@@ -356,6 +362,7 @@ class OpenBallot(ARC4Contract):
             box_storage_del_refund_itxn.receiver == Txn.sender
         ), "box_storage_del_refund_itxn reciever address must match transaction sender address."
 
+
     # Enable application creator to execute box storage purge, this deletes any boxes not deleted by other accounts
     @arc4.abimethod  # NOTE: Can also use arc4.StaticArray[arc4.Address, t.Literal[8]] to enforce strict size of 8
     def purge_box_storage(self, box_keys: arc4.DynamicArray[arc4.Address]) -> None:
@@ -367,6 +374,10 @@ class OpenBallot(ARC4Contract):
         # assert (
         #     Global.latest_timestamp >= (self.poll_end_date_unix + UInt64(7 * 24 * 60 * 60))
         # ), "Box storage purge only possible after voting period + 7-day box storage deletion window is over."
+
+        assert (
+            self.total_purged_box_a_== 0
+        ), "Unable to purge! Application creator has already purged box_a."
 
         assert (
             box_keys.length > 0 and box_keys.length < 9
@@ -389,6 +400,7 @@ class OpenBallot(ARC4Contract):
             self.total_purged_box_a_ += UInt64(
                 1
             )  # Increment box 'a_' purged total amount
+
 
     # Allow application creator to delete the smart contract client, decrease their MBR balance + any remaining box MBR
     @arc4.abimethod(create="disallow", allow_actions=["DeleteApplication"])

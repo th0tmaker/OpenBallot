@@ -3,7 +3,7 @@
 import { AlgorandClient } from '@algorandfoundation/algokit-utils'
 import { consoleLogger } from '@algorandfoundation/algokit-utils/types/logging'
 import { useWallet } from '@txnlab/use-wallet'
-import { encodeAddress } from 'algosdk'
+import { decodeAddress, encodeAddress } from 'algosdk'
 import React, { useCallback, useEffect, useState } from 'react'
 import { AppBaseInfo } from './components/AppBaseInfo'
 import ConnectWallet from './components/ConnectWallet'
@@ -62,34 +62,11 @@ const Home: React.FC = () => {
   const [activeSection, setActiveSection] = useState<UISectionState>('HOME') // Set and update the UI diplay sections
 
   // Button State
-  const { btnStates, updateBtnStates } = button.setBtnState() // Set and update the state of buttons
+  const { btnStates, updateBtnStates } = button.useBtnState() // Set and update the state of buttons
 
   // ==================================================
   // * EVENT LISTENER (manage lifecycle side-effects) *
   // ==================================================
-
-  // Query App Client Box Storage
-  // useEffect(() => {
-  //   const queryBoxStorage = async () => {
-  //     if (!currentAppId || activeAddress) return
-
-  //     try {
-  //       const appBoxes = await algorand.app.getBoxNames(currentAppId)
-  //       const boxAddresses: string[] = []
-  //       appBoxes.forEach((box) => {
-  //         const boxKey = new Uint8Array(Buffer.from(box.nameBase64.toString(), 'base64'))
-  //         const addr = encodeAddress(boxKey.slice(-32))
-  //         boxAddresses.push(addr)
-  //       })
-  //       setAppBoxes(boxAddresses)
-  //       consoleLogger.info('querry box addrs: ', boxAddresses.toString())
-  //     } catch (error) {
-  //       consoleLogger.error(`Error loading Box Names for App client with ID: ${currentAppId.toString()}!`, error)
-  //     }
-  //   }
-
-  //   queryBoxStorage()
-  // }, [currentAppId, appBoxes.length])
 
   // Checking the validity of user-provided poll inputs
   useEffect(() => {
@@ -99,7 +76,7 @@ const Home: React.FC = () => {
       const arePollInputsValid = pollInputs.processPollInputs(currentPollInputs, activeSection, setUserMsg)
       updateBtnStates({ pollInputsValid: arePollInputsValid }) // Update the button state accordingly
     }
-  }, [currentPollInputs, btnStates.pollInputsValid, activeSection, setUserMsg])
+  }, [currentPollInputs, btnStates.pollInputsValid, activeSection === 'CREATION', setUserMsg])
 
   // Load App Client Global State
   useEffect(() => {
@@ -181,6 +158,24 @@ const Home: React.FC = () => {
   // ================
 
   // Toggle the state of selected modal
+
+  // Function to check the voting period status
+  const checkVotingStatus = () => {
+    if (currentAppClient && activeSection === 'ENGAGEMENT') {
+      const currentVotingPeriod = date.checkVotingPeriod(currentAppClient.pollStartDateUnix, currentAppClient.pollEndDateUnix)
+      if (currentVotingPeriod.open === votingPeriod.open) {
+        return // Return early if the voting period status hasn't changed
+      }
+
+      // Update votingPeriod and button state
+      setVotingPeriod(currentVotingPeriod)
+      consoleLogger.info('Voting Status:', currentVotingPeriod)
+
+      updateBtnStates({
+        pollVotingPeriodOpen: currentVotingPeriod.open,
+      })
+    }
+  }
 
   const toggleModal = (modal: keyof iInterface.ModalStateFlags, state?: boolean) => {
     setModals((prev) => ({
@@ -324,25 +319,48 @@ const Home: React.FC = () => {
       const pollChoice1 = appGlobalState['poll_choice1']?.value || ''
       const pollChoice2 = appGlobalState['poll_choice2']?.value || ''
       const pollChoice3 = appGlobalState['poll_choice3']?.value || ''
+      const totalPurgedBoxA_ = BigInt(appGlobalState['total_purged_box_a_']?.value ?? null)
       const pollStartDateUnix = BigInt(appGlobalState['poll_start_date_unix']?.value ?? 0)
       const pollEndDateUnix = BigInt(appGlobalState['poll_end_date_unix']?.value ?? 0)
-
+      console.log('totalPurgedBoxA_', totalPurgedBoxA_)
       // Convert the poll start and end dates into unix integers into string appropriate format
       const pollStartDateStr = date.convertUnixToDate(pollStartDateUnix)
       const pollEndDateStr = date.convertUnixToDate(pollEndDateUnix)
 
+      // Check voting status (if voting is open or closed)
+      const currentVotingPeriod = date.checkVotingPeriod(pollStartDateUnix, pollEndDateUnix)
+      setVotingPeriod(currentVotingPeriod) // Set 'votingPeriod'
+      consoleLogger.info('Voting Status:', currentVotingPeriod)
+
       const appBoxes = await algorand.app.getBoxNames(currentAppId)
-      const boxAddresses: string[] = []
-      appBoxes.forEach((box) => {
-        const boxKey = new Uint8Array(Buffer.from(box.nameBase64.toString(), 'base64'))
-        const addr = encodeAddress(boxKey.slice(-32))
-        boxAddresses.push(addr)
-      })
+      const boxAddresses = appBoxes.map((box) => encodeAddress(new Uint8Array(Buffer.from(box.nameBase64, 'base64')).slice(-32)))
+      consoleLogger.info('boxAddressses len:', boxAddresses.length)
+      let hasVoted = null
+      let votedFor = null
+      if (boxAddresses.includes(activeAddress)) {
+        try {
+          const boxName = new Uint8Array([
+            ...Buffer.from('a_'), // Prefix
+            ...decodeAddress(activeAddress).publicKey, // Address in Uint8Array format
+          ])
+          const boxVal = await algorand.app.getBoxValue(currentAppId, boxName)
+          if (boxVal) {
+            hasVoted = Number(boxVal[0]) // First byte: hasVoted
+            votedFor = Number(boxVal[1]) // Second byte: votedFor
+          }
+        } catch (error) {
+          consoleLogger.error('Error fetching box value:', error)
+          // Handle the error (e.g., box doesn't exist)
+        }
+      }
 
       // Update the button states based on whether the active address has box storage
-      const hasBoxStorage = boxAddresses.includes(activeAddress ?? '')
       updateBtnStates({
-        hasBoxStorage,
+        hasBoxStorage: boxAddresses.includes(activeAddress),
+        isCreator: activeAddress === app.creator,
+        voteSubmitted: hasVoted == 1,
+        ableToPurgeBoxA_: boxAddresses.length !== 1,
+        pollVotingPeriodOpen: currentVotingPeriod.open,
       })
 
       // Use AppClientProps interface to construct an object representing the new state of the current App Client based on its Global State data
@@ -359,70 +377,74 @@ const Home: React.FC = () => {
         pollStartDateUnix: pollStartDateUnix,
         pollEndDateUnix: pollEndDateUnix,
         boxes: boxAddresses,
-        // pollVoteStatus: null,
-        // pollVoteChoice: null,
-        // isOptedIn: false,
+        // hasBoxStorage: boxAddresses.includes(activeAddress),
+        hasVoted: hasVoted,
+        votedFor: votedFor,
       }
 
       // Set new App client state object as 'currentAppClient'
       setCurrentAppClient(newAppClient)
 
       consoleLogger.info(newAppClient.boxes.toString())
+      // consoleLogger.info(newAppClient.hasBoxStorage.toString())
+      consoleLogger.info(newAppClient.hasVoted?.toString() ?? '')
+      consoleLogger.info(newAppClient.votedFor?.toString() ?? '')
+
       consoleLogger.info(`Global State for App client with ID: ${currentAppId.toString()} has been queried successfully!`)
     } catch (error) {
       consoleLogger.error(`Failed to query Global State for App client with ID: ${currentAppId.toString()}!`)
     }
-  }, [activeAddress, currentAppId, algorand.app])
+  }, [activeAddress, currentAppId, algorand.app, votingPeriod])
 
-  // Create a method that requests Local State information of an account for a specific client by passing the account address and client App ID through the Algorand client
-  const queryLocalState = async (appId: bigint, address: string) => {
-    if (!activeAddress) {
-      consoleLogger.error('Broke out queryLocalState: activeAddress not found!')
-      setUserMsg({
-        msg: 'Account address not found! Please check if your wallet is connected.',
-        style: 'text-red-700 font-bold',
-      })
-      return
-    }
+  // // Create a method that requests Local State information of an account for a specific client by passing the account address and client App ID through the Algorand client
+  // const queryLocalState = async (appId: bigint, address: string) => {
+  //   if (!activeAddress) {
+  //     consoleLogger.error('Broke out queryLocalState: activeAddress not found!')
+  //     setUserMsg({
+  //       msg: 'Account address not found! Please check if your wallet is connected.',
+  //       style: 'text-red-700 font-bold',
+  //     })
+  //     return
+  //   }
 
-    if (!appId) {
-      consoleLogger.error('Broke out queryLocalState: App ID not found!')
-      setUserMsg({
-        msg: `Client with App ID: ${appId?.toString()} not found.`,
-        style: 'text-red-700 font-bold',
-      })
-      return
-    }
+  //   if (!appId) {
+  //     consoleLogger.error('Broke out queryLocalState: App ID not found!')
+  //     setUserMsg({
+  //       msg: `Client with App ID: ${appId?.toString()} not found.`,
+  //       style: 'text-red-700 font-bold',
+  //     })
+  //     return
+  //   }
 
-    try {
-      // Query account address information from specific client by passing its App ID
-      const accountAppInfo = await algorand.client.algod.accountApplicationInformation(address, Number(appId)).do()
+  //   try {
+  //     // Query account address information from specific client by passing its App ID
+  //     const accountAppInfo = await algorand.client.algod.accountApplicationInformation(address, Number(appId)).do()
 
-      // Check access to account Local State
-      const accountLocalState = accountAppInfo['app-local-state']
+  //     // Check access to account Local State
+  //     const accountLocalState = accountAppInfo['app-local-state']
 
-      // If there is no data about account Local State tied to queried App Client (then account is NOT opted in to client)
-      if (!accountLocalState) {
-        consoleLogger.info(`No Local State found for Account with address: ${address}. Check if Account is opted in.`)
+  //     // If there is no data about account Local State tied to queried App Client (then account is NOT opted in to client)
+  //     if (!accountLocalState) {
+  //       consoleLogger.info(`No Local State found for Account with address: ${address}. Check if Account is opted in.`)
 
-        // Return Local State keys with following default values
-        return { optedIn: false, localVoteStatus: null, localVoteChoice: null }
-      }
+  //       // Return Local State keys with following default values
+  //       return { optedIn: false, localVoteStatus: null, localVoteChoice: null }
+  //     }
 
-      // If data about account Local State tied to queried App client exists (then account is opted in), proceed with data extraction
-      const accountLocalVoteStatus = Number(accountLocalState['key-value']?.[1]?.['value']?.['uint'])
-      const accountLocalVoteChoice = Number(accountLocalState['key-value']?.[0]?.['value']?.['uint'])
+  //     // If data about account Local State tied to queried App client exists (then account is opted in), proceed with data extraction
+  //     const accountLocalVoteStatus = Number(accountLocalState['key-value']?.[1]?.['value']?.['uint'])
+  //     const accountLocalVoteChoice = Number(accountLocalState['key-value']?.[0]?.['value']?.['uint'])
 
-      // Return Local State keys with extracted values
-      return { optedIn: true, localVoteStatus: accountLocalVoteStatus, localVoteChoice: accountLocalVoteChoice }
-    } catch (error) {
-      consoleLogger.error('Error querying local state:', error)
-      consoleLogger.error(`Failed to query Local State for Account Address: ${address} tied to App client with ID: ${appId.toString()}!`)
+  //     // Return Local State keys with extracted values
+  //     return { optedIn: true, localVoteStatus: accountLocalVoteStatus, localVoteChoice: accountLocalVoteChoice }
+  //   } catch (error) {
+  //     consoleLogger.error('Error querying local state:', error)
+  //     consoleLogger.error(`Failed to query Local State for Account Address: ${address} tied to App client with ID: ${appId.toString()}!`)
 
-      // If error fetching data, return Local State keys with following default values
-      return { optedIn: false, localVoteStatus: null, localVoteChoice: null }
-    }
-  }
+  //     // If error fetching data, return Local State keys with following default values
+  //     return { optedIn: false, localVoteStatus: null, localVoteChoice: null }
+  //   }
+  // }
 
   // Create a new OpenBallot smart contract App client
   const initNewApp = async () => {
@@ -456,9 +478,8 @@ const Home: React.FC = () => {
 
       consoleLogger.info('Create method successfully generated new App client!')
 
-      // Execute smart contract setPoll method
-      consoleLogger.info('Executing Set Poll method. Generating App client poll!')
-      await openBallotMethodManager.setPoll(
+      // Execute Atomic transaction w/ setPoll and fundAppMbr methods
+      await openBallotMethodManager.setPollFundAppMbrAtxn(
         activeAddress,
         appClient.appId,
         currentPollInputs.title,
@@ -469,13 +490,28 @@ const Home: React.FC = () => {
         BigInt(date.convertDateToUnix(currentPollInputs.endDate)),
       )
 
-      consoleLogger.info('Set Poll method successfully created App client poll!')
+      consoleLogger.info('Set Poll + Fund App MBR atomic txn successful!')
 
-      // Execute smart contract fundAppMbr method
-      consoleLogger.info('Executing Fund App MBR method. Creator is funding App account balance!')
-      await openBallotMethodManager.fundAppMbr(activeAddress, appClient.appId)
+      // // Execute smart contract setPoll method
+      // consoleLogger.info('Executing Set Poll method. Generating App client poll!')
+      // await openBallotMethodManager.setPoll(
+      //   activeAddress,
+      //   appClient.appId,
+      //   currentPollInputs.title,
+      //   currentPollInputs.choices[0],
+      //   currentPollInputs.choices[1],
+      //   currentPollInputs.choices[2],
+      //   BigInt(date.convertDateToUnix(currentPollInputs.startDate)),
+      //   BigInt(date.convertDateToUnix(currentPollInputs.endDate)),
+      // )
 
-      consoleLogger.info('Fund App MBR method successfully funded App client!')
+      // consoleLogger.info('Set Poll method successfully created App client poll!')
+
+      // // Execute smart contract fundAppMbr method
+      // consoleLogger.info('Executing Fund App MBR method. Creator is funding App account balance!')
+      // await openBallotMethodManager.fundAppMbr(activeAddress, appClient.appId)
+
+      // consoleLogger.info('Fund App MBR method successfully funded App client!')
 
       // Set newly generated appClient.appId as outer-scope currentAppId
       setCurrentAppId(appClient.appId)
@@ -531,29 +567,43 @@ const Home: React.FC = () => {
       })
     }
   }
+
   // Execute when Cancel button is clicked
   const onCancelBtnClick = () => {
-    // Reset by clearing previous poll inputs stored by user
-    setCurrentPollInputs({
-      title: '',
-      choices: ['', '', ''],
-      startDate: '',
-      endDate: '',
-    })
+    if (!activeAddress) {
+      consoleLogger.error('Broke out onCancelBtnClick: activeAddress not found!')
+      setUserMsg({
+        msg: 'Account address not found! Please check if your wallet is connected.',
+        style: 'text-red-700 font-bold',
+      })
+      return
+    }
 
-    setChoiceDecision(null) // Reset choice decision to null
+    try {
+      // Reset by clearing previous poll inputs stored by user
+      setCurrentPollInputs({
+        title: '',
+        choices: ['', '', ''],
+        startDate: '',
+        endDate: '',
+      })
 
-    setActiveSection('HOME') // set UI section to 'HOME'
+      setChoiceDecision(null) // Reset choice decision to null
 
-    // Close any open modals
-    toggleModal('joinApp', false) // Close Join App modal
-    toggleModal('deleteApp', false) // Close Delete App modal
+      setActiveSection('HOME') // set UI section to 'HOME'
 
-    // Reset user message panel every time cancel button is clicked
-    setUserMsg({
-      msg: '',
-      style: '',
-    })
+      // Close any open modals
+      toggleModal('joinApp', false) // Close Join App modal
+      toggleModal('deleteApp', false) // Close Delete App modal
+
+      // Reset user message panel every time cancel button is clicked
+      setUserMsg({
+        msg: '',
+        style: '',
+      })
+    } catch (error) {
+      consoleLogger.error('Error with Create (Poll) button click!', error)
+    }
   }
 
   // Execute when Delete button is clicked
@@ -573,16 +623,24 @@ const Home: React.FC = () => {
         return // Return and break out if user is not authorized to delete currentAppClient
       }
 
+      if (btnStates.actionLoading) {
+        return // Exit the function or handle accordingly
+      }
+
+      updateBtnStates({
+        actionLoading: true,
+      })
+
       // Execute smart contract purgeBoxStorage method
       consoleLogger.info(`Executing Purge Box Storage on client with App ID: ${currentAppClient.appId.toString()}!`)
-      await openBallotMethodManager.purgeBoxStorage(currentAppClient.creatorAddress, currentAppClient.appId)
+      // await openBallotMethodManager.purgeBoxStorage(currentAppClient.creatorAddress, currentAppClient.appId)
+      await openBallotMethodManager.purgeBoxStorageAtxn(currentAppClient.creatorAddress, currentAppClient.appId)
       consoleLogger.info(`Purge Box Storage method successful on client with App ID: ${currentAppClient.appId.toString()}!`)
 
-      // Clear current App Client data
-      // setCurrentAppId(null)
-      // setCurrentAppClient(null)
-
-      // setActiveSection('HOME') // Switch UI section to home
+      updateBtnStates({
+        actionLoading: false,
+        ableToPurgeBoxA_: false,
+      })
 
       // Notify user of success
       setUserMsg({
@@ -596,6 +654,11 @@ const Home: React.FC = () => {
       setUserMsg({
         msg: `Failed purging Box Storage for App with ID: ${currentAppClient?.appId.toString()}.`,
         style: 'text-red-700 font-bold',
+      })
+    } finally {
+      // Finally, update Buton state 'actionLoading' back to false
+      updateBtnStates({
+        actionLoading: false,
       })
     }
   }
@@ -950,8 +1013,8 @@ const Home: React.FC = () => {
       // Execute smart contract submitVote method
       consoleLogger.info(`Executing Submit Vote method on client with App ID: ${currentAppClient.appId.toString()}!`)
       await openBallotMethodManager.submitVote(activeAddress, currentAppClient.appId, choiceDecision)
-      consoleLogger.info(`Submit Vote method successfull on client with App ID: ${currentAppClient.appId.toString()}!`)
-      consoleLogger.info(`Submit Vote method successfull for account address: ${activeAddress}`)
+      consoleLogger.info(`Submit Vote method successful on client with App ID: ${currentAppClient.appId.toString()}!`)
+      consoleLogger.info(`Submit Vote method successful for account address: ${activeAddress}`)
 
       // Reset by clearing previous poll inputs stored by user
       setCurrentPollInputs({
@@ -969,8 +1032,8 @@ const Home: React.FC = () => {
       // Update currentAppClient with new values
       const updatedAppClient = {
         ...currentAppClient,
-        pollVoteStatus: 1,
-        pollVoteChoice: Number(choiceDecision),
+        hasVoted: 1,
+        votedFor: Number(choiceDecision),
       }
 
       // Set updatedApp as new currentAppClient
@@ -1186,10 +1249,12 @@ const Home: React.FC = () => {
                 <p className="text-[20px] -mt-2 font-bold text-gray-800">
                   Is Voting Open :{' '}
                   <span className={votingPeriod.open ? 'font-bold text-green-700' : 'text-red-700'}>{votingPeriod.msg}</span>
+                  {/* Refresh button */}
+                  <button onClick={checkVotingStatus}>Refresh Voting Status</button>
                 </p>
-                {/* {currentAppClient?.pollVoteStatus === 1 && (
+                {currentAppClient?.hasVoted === 1 && (
                   <p className="text-[20px] font-bold text-green-700">You have already submitted your vote for this poll!</p>
-                )} */}
+                )}
                 <div>
                   <p className="text-[20px] text-left font-semibold underline mb-4">Choices:</p>
                   <ul className="space-y-2">
@@ -1220,11 +1285,11 @@ const Home: React.FC = () => {
                         ),
                     )}
                   </ul>
-                  {/* {currentAppClient?.pollVoteStatus === 1 && (
+                  {currentAppClient?.hasVoted === 1 && (
                     <p className="text-[26px] font-bold text-gray-800">
                       You have voted for choice: <span className="font-bold text-green-700">{choiceDisplay.text}</span>
                     </p>
-                  )} */}
+                  )}
                 </div>
               </div>
               <div className="mt-6 flex justify-center">

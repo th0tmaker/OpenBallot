@@ -1,14 +1,13 @@
-//./utils/buttons.ts
-
 import { useCallback, useState } from 'react'
 import { UIButton } from '../types'
 import { BtnStateFlags } from '../interfaces/btnState'
 
 // Default state
-const defautlBtnStates: BtnStateFlags = {
+const defaultBtnStates: BtnStateFlags = {
   actionLoading: false,
-  // optedIn: false,
+  isCreator: false,
   hasBoxStorage: false,
+  ableToPurgeBoxA_: false,
   voteSubmitted: false,
   pollInputsValid: false,
   pollVotingPeriodOpen: false,
@@ -20,35 +19,36 @@ const baseBtnStyle =
 
 // Button style generator
 export const setBtnStyle = (type: UIButton): string => {
-  if (type === 'cancel') {
-    return `${baseBtnStyle} hover:bg-red-500 hover:border-red-700`
+  switch (type) {
+    case 'cancel':
+      return `${baseBtnStyle} hover:bg-red-500 hover:border-red-700`
+    default:
+      return `${baseBtnStyle} hover:bg-green-500 hover:border-green-700`
   }
-  return `${baseBtnStyle} hover:bg-green-500 hover:border-green-700`
 }
 
 // Utility function to check disable conditions based on button type
+const btnDisableConditions: Record<UIButton, (flag: BtnStateFlags) => boolean> = {
+  create: (flag) => flag.actionLoading || !flag.pollInputsValid,
+  requestBox: (flag) => flag.actionLoading || flag.isCreator || flag.hasBoxStorage,
+  deleteBox: (flag) => flag.actionLoading || flag.isCreator || !flag.hasBoxStorage,
+  choices: (flag) => flag.actionLoading || !flag.hasBoxStorage || flag.voteSubmitted || !flag.pollVotingPeriodOpen,
+  submitVote: (flag) => flag.actionLoading || !flag.hasBoxStorage || flag.voteSubmitted || !flag.pollVotingPeriodOpen,
+  purge: (flag) => flag.actionLoading || !flag.isCreator || !flag.ableToPurgeBoxA_,
+  delete: (flag) => flag.actionLoading,
+  start: (flag) => flag.actionLoading,
+  join: (flag) => flag.actionLoading,
+  wallet: (flag) => flag.actionLoading,
+  cancel: (flag) => flag.actionLoading,
+}
+
 export const checkBtnState = (type: UIButton, flag: BtnStateFlags): boolean => {
-  switch (type) {
-    case 'create':
-      return flag.actionLoading || !flag.pollInputsValid
-    case 'requestBox':
-      return flag.actionLoading || flag.hasBoxStorage
-    case 'deleteBox':
-      return flag.actionLoading || !flag.hasBoxStorage
-    case 'choices':
-      return flag.actionLoading || !flag.hasBoxStorage || flag.voteSubmitted || !flag.pollVotingPeriodOpen
-    case 'submitVote':
-      return flag.actionLoading || !flag.hasBoxStorage || flag.voteSubmitted || !flag.pollVotingPeriodOpen
-    case 'delete':
-      return flag.actionLoading
-    default:
-      return false
-  }
+  return btnDisableConditions[type]?.(flag) ?? false
 }
 
 // Hook for managing button states
-export const setBtnState = () => {
-  const [btnStates, setBtnState] = useState<BtnStateFlags>(defautlBtnStates)
+export const useBtnState = () => {
+  const [btnStates, setBtnState] = useState<BtnStateFlags>(defaultBtnStates)
 
   const updateBtnStates = useCallback((updates: Partial<BtnStateFlags>) => {
     setBtnState((prev) => ({ ...prev, ...updates }))
