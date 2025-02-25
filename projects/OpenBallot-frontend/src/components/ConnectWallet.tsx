@@ -31,13 +31,13 @@ const ConnectWallet = ({ openModal, closeModal }: ConnectWalletInterface) => {
       consoleLogger.info('Failed changing Account to next index:', error)
     }
   }
-
   const changeActiveAccountByNameRef = async (provider: Provider) => {
     try {
-      for (const addr of connectedAccounts) {
-        if (addr.name == userInputAddr) {
-          provider.setActiveAccount(addr.address)
-        }
+      const account = connectedAccounts.find((acc) => acc.address === userInputAddr || acc.name === userInputAddr)
+      if (account) {
+        provider.setActiveAccount(account.address)
+      } else {
+        consoleLogger.info('Account not found with the provided name or address')
       }
     } catch (error) {
       consoleLogger.info('Failed changing Account to name reference:', error)

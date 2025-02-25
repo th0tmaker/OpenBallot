@@ -103,15 +103,6 @@ export class OpenBallotMethodManager {
     return this.algorand.account.getSigner(account)
   }
 
-  // private async getSuggestedParams() {
-  //   // Retrieve and setup suggested params for a transaction.
-  //   const sp = await this.algorand.getSuggestedParams()
-  //   const status = await this.algorand.client.algod.status().do()
-  //   // sp.firstRound = status['last-round']
-  //   // sp.lastRound = sp.firstRound + 1000
-  //   return sp
-  // }
-
   /**
    * Generates a box name based on the sender's address.
    *
@@ -295,81 +286,42 @@ export class OpenBallotMethodManager {
   }
 
   /**
-   * Sets poll properties for the application (appId) specified by its unique identifier.
+   * Executes a composite atomic transaction that sets up a new poll and funds the application account.
    *
-   * This method can only be executed by the application creator. It uses the application client (`getAppClient`)
-   * to send a `setPoll` transaction, which updates the poll settings such as title, choices, and poll duration.
+   * This method bundles two separate ABI method calls into a single atomic transaction:
+   * 1. `set_poll` - Initializes a new poll by setting its title, choices, and voting period (start and end dates).
+   * 2. `fund_app_mbr` - Sends a minimum balance funding payment to the application account, which is used
+   *    to ensure sufficient funds to cover Global minimum balance and creator box storage allocation.
    *
    * Important Notes:
-   * - Only the app creator has permission to set the poll data.
-   * - This method encodes the title and choices as bytes before sending them to the application.
-   * - The poll's start and end times are specified in Unix timestamp format (seconds since epoch).
+   * - Both method calls are executed atomically. This means that either both calls succeed or neither
+   *   does, ensuring consistent application state.
+   * - The `set_poll` method encodes textual inputs (poll title and choices) using UTF-8 encoding.
+   * - The `fund_app_mbr` method wraps a payment transaction (mbrPay) in a TransactionWithSigner format.
+   * - The application creator's account is used to sign both transactions.
+   * - The method relies on the `AtomicTransactionComposer` to bundle the two ABI calls and execute them
+   *   together. Confirmation of the atomic transaction round is required; otherwise, an error is thrown.
    *
-   * @param creator - The address of the account that created the application. This account must set the poll.
-   * @param appId - The unique identifier of the application for which the poll settings will be updated.
-   * @param title - The title of the poll (e.g., "Favorite Color?").
-   * @param choice1 - The first choice in the poll (e.g., "Red").
-   * @param choice2 - The second choice in the poll (e.g., "Blue").
-   * @param choice3 - The third choice in the poll (e.g., "Green").
-   * @param startDateUnix - The poll's start date in Unix timestamp format (seconds since epoch).
-   * @param endDateUnix - The poll's end date in Unix timestamp format (seconds since epoch).
+   * @param creator - The address of the application creator and sender of the transactions.
+   * @param appId - The unique ID of the deployed application.
+   * @param title - The title of the poll.
+   * @param choice1 - The first poll choice.
+   * @param choice2 - The second poll choice.
+   * @param choice3 - The third poll choice.
+   * @param startDateUnix - The UNIX timestamp for the start of the voting period.
+   * @param endDateUnix - The UNIX timestamp for the end of the voting period.
+   *
+   * @returns Void. Throws an error if the atomic transaction round confirmation fails.
    *
    * Steps:
-   * 1. Retrieve the application client for the specified appId using `getAppClient`.
-   * 2. Send a `setPoll` transaction using the creator's account, which:
-   *    - Updates the poll title and choices (encoded as bytes).
-   *    - Sets the start and end times for the poll.
-   *    - Ensures only the creator has permission to perform this update.
+   * 1. Retrieve the application client for the given appId.
+   * 2. Create an AtomicTransactionComposer instance.
+   * 3. Construct a payment transaction (`mbrPay`) for funding the application account.
+   * 4. Add a method call for `set_poll` with UTF-8 encoded poll title and choices, and the specified voting period.
+   * 5. Add a method call for `fund_app_mbr` using the payment transaction wrapped in a TransactionWithSigner object.
+   * 6. Execute the atomic transaction.
+   * 7. Await transaction confirmation and throw an error if confirmation is not received.
    */
-  async setPoll(
-    creator: string,
-    appId: bigint,
-    title: string,
-    choice1: string,
-    choice2: string,
-    choice3: string,
-    startDateUnix: bigint,
-    endDateUnix: bigint,
-  ) {
-    // Retrieve the application client for the specified application ID.
-    const client = this.getAppClient(appId)
-
-    // Send the setPoll transaction using the creator's address.
-    await client.send.setPoll({
-      sender: creator, // Only the app creator can send this transaction.
-      signer: this.getSigner(creator), // The signer for the creator's transactions.
-      args: {
-        title: new TextEncoder().encode(title), // Encode the title as bytes.
-        choice1: new TextEncoder().encode(choice1), // Encode the first choice as bytes.
-        choice2: new TextEncoder().encode(choice2), // Encode the second choice as bytes.
-        choice3: new TextEncoder().encode(choice3), // Encode the third choice as bytes.
-        startDateUnix, // Set the poll's start time (Unix timestamp).
-        endDateUnix, // Set the poll's end time (Unix timestamp).
-      },
-    })
-  }
-
-  async fundAppMbr(creator: string, appId: bigint) {
-    const client = this.getAppClient(appId)
-
-    // Define the MBR payment transaction
-    const mbrPay = await this.algorand.createTransaction.payment({
-      sender: creator,
-      signer: this.getSigner(creator),
-      receiver: client.appAddress,
-      amount: (116_900).microAlgos(), // App Global.minBalance + BoxStorageMBR
-      note: 'Creator funding App account address MBR.',
-    })
-
-    // Send the fundAppMbr transaction using the sender's address.
-    await client.send.fundAppMbr({
-      sender: creator,
-      signer: this.getSigner(creator),
-      boxReferences: [{ appId, name: this.getBoxName(creator) }],
-      args: { mbrPay: mbrPay },
-    })
-  }
-
   async setPollFundAppMbrAtxn(
     creator: string,
     appId: bigint,
@@ -391,7 +343,6 @@ export class OpenBallotMethodManager {
       signer: this.getSigner(creator),
       receiver: client.appAddress,
       amount: (116_900).microAlgos(), // App Global.minBalance + BoxStorageMBR
-      note: 'abi:fund_app_mbr(mbr_payment).',
     })
 
     atxn.addMethodCall({
@@ -407,7 +358,6 @@ export class OpenBallotMethodManager {
       ],
       sender: creator,
       suggestedParams: await this.algorand.getSuggestedParams(),
-      note: new Uint8Array(Buffer.from('abi:set_poll')),
       signer: this.getSigner(creator),
     })
 
@@ -418,7 +368,6 @@ export class OpenBallotMethodManager {
       sender: creator,
       suggestedParams: await this.algorand.getSuggestedParams(),
       boxes: [{ appIndex: appID, name: this.getBoxName(creator) }],
-      note: new Uint8Array(Buffer.from('abi:fund_app_mbr')),
       signer: this.getSigner(creator),
     })
 
@@ -518,6 +467,29 @@ export class OpenBallotMethodManager {
     })
   }
 
+  /**
+   * Deletes the box storage for the specified application.
+   *
+   * This method allows the sender (typically the application creator or an authorized account)
+   * to delete the box storage associated with the deployed application. Box storage in this
+   * context refers to the off-chain or on-chain data storage that is maintained for the application.
+   *
+   * Important Notes:
+   * - The method sends a delete transaction that targets a specific box, identified by the appId and a box name.
+   * - The box name is derived from the sender’s address using the helper function `getBoxName`.
+   * - No additional arguments are required for this operation.
+   *
+   * @param sender - The address of the account executing the deletion of box storage.
+   * @param appId - The unique ID of the deployed application whose box storage is to be deleted.
+   *
+   * @returns Void. This method completes after successfully sending the deleteBoxStorage transaction.
+   *
+   * Steps:
+   * 1. Retrieve the application client using the provided appId.
+   * 2. Construct a box reference using the appId and the box name obtained from `getBoxName(sender)`.
+   * 3. Call the `deleteBoxStorage` method on the client, providing the sender, signer, box reference, and an empty arguments array.
+   * 4. Await the transaction execution to ensure the deletion is processed.
+   */
   async deleteBoxStorage(sender: string, appId: bigint) {
     const client = this.getAppClient(appId)
 
@@ -530,132 +502,104 @@ export class OpenBallotMethodManager {
     })
   }
 
+  /**
+   * Executes an atomic transaction that purges non-creator box storage entries.
+   *
+   * This method is designed for the application creator to delete box storage entries
+   * associated with non-creator accounts. Box storage is stored as keyed data on the
+   * application, and this method purges these entries in batches (up to max 8 boxes per batch).
+   *
+   * Important Notes:
+   * - Only non-creator boxes are purged. The method filters out boxes whose keys correspond
+   *   to the creator’s address.
+   * - The method groups the box keys into batches of 8, and then processes these batches using
+   *   multiple AtomicTransactionComposer instances. The composers are used to bundle and execute
+   *   the purge calls atomically.
+   * - The `purge_box_storage` ABI method is called with a dynamic array of box keys (addresses)
+   *   to be purged. Box names are constructed by prefixing the decoded box key with "a_".
+   * - The method executes every two batches (or the final batch if there is an odd number) and
+   *   confirms the transaction round. An error is thrown if confirmation fails.
+   *
+   * @param creator - The address of the application creator (only the creator is allowed to purge boxes).
+   * @param appId - The unique ID of the deployed application.
+   *
+   * @returns Void. The method throws an error if the atomic transaction round confirmation fails.
+   *
+   * Steps:
+   * 1. Retrieve the application client and application boxes for the given appId.
+   * 2. Iterate over the retrieved boxes to filter out those that belong to the creator and decode
+   *    the box keys into addresses.
+   * 3. Split the resulting box key addresses into batches of up to 8 keys each.
+   * 4. Initialize a set of AtomicTransactionComposer instances, one for every two batches.
+   * 5. For each batch:
+   *    a. Determine the corresponding composer ID.
+   *    b. Construct the box name by concatenating the prefix "a_" with the decoded box key.
+   *    c. Add a method call to the composer for the `purge_box_storage` ABI method using the batch.
+   *    d. Execute the composer when two batches have been processed (or at the end if there's an odd number).
+   *    e. Check for transaction confirmation and throw an error if confirmation is not received.
+   */
   async purgeBoxStorageAtxn(creator: string, appId: bigint) {
     const client = this.getAppClient(appId)
     const appID = Number(appId)
+
+    // Fetch application boxes
     const appBoxes = await this.algorand.client.algod.getApplicationBoxes(appID).do()
 
+    // Filter and decode box keys
     const boxKeysAddresses: string[] = []
     for (const box of appBoxes.boxes) {
       if (box.name) {
         const address = encodeAddress(box.name.slice(-32))
-        if (address != creator) {
-          boxKeysAddresses.push(address)
-        }
-      }
-    }
-
-    const boxKeyBatches: Uint8Array[][] = []
-    for (let i = 0; i < boxKeysAddresses.length; i += 8) {
-      const batchPromises = boxKeysAddresses.slice(i, i + 8).map(async (key) => {
-        return decodeAddress(key).publicKey
-      })
-
-      // Wait for all promises in the batch to resolve
-      const batch = await Promise.all(batchPromises)
-      boxKeyBatches.push(batch)
-    }
-
-    console.log('boxkey batches', boxKeyBatches)
-
-    const atxnFactory: { [key: string]: AtomicTransactionComposer } = {}
-    const numComposers = Math.floor((boxKeyBatches.length + 1) / 2)
-    for (let i = 0; i < numComposers; i++) {
-      atxnFactory[`atxn_${i + 1}`] = new AtomicTransactionComposer()
-    }
-
-    // Process batches in parallel
-    await Promise.all(
-      boxKeyBatches.map(async (batch, index) => {
-        console.log('boxkey batches2', boxKeyBatches)
-        console.log('batch', batch)
-        const atxnId = Math.floor(index / 2 + 1)
-        // (batch_counter // 2) + 1
-        console.log('atxn ID: ', atxnId)
-        // Proceed only if the batch is not empty
-        while (batch) {
-          const boxNames = batch.map((boxKey) => new Uint8Array([...Buffer.from('a_'), ...boxKey]))
-          console.log('box names', boxNames)
-          atxnFactory[`atxn_${atxnId}`].addMethodCall({
-            appID: appID,
-            method: ABIMethod.fromSignature(client.appClient.getABIMethod('purge_box_storage').getSignature()),
-            methodArgs: [batch],
-            sender: creator,
-            suggestedParams: await this.algorand.getSuggestedParams(),
-            boxes: boxNames.map((name) => ({ appIndex: appID, name })),
-            note: new Uint8Array(Buffer.from('abi:purge_box_storage')),
-            signer: this.getSigner(creator),
-          })
-
-          if (index % 2 == 1 || index === boxKeyBatches.length - 1) {
-            const atxnRes = await atxnFactory[`atxn_${atxnId}`].execute(this.algorand.client.algod, 2)
-
-            if (!atxnRes.confirmedRound) {
-              throw new Error('atxn_res atomic transaction round needs confirmation.')
-            }
-          }
-
-          console.log('konec')
-          // if batch_counter % 2 == 1 or len(bk_batches) == 0:
-          // logger.info(f"Executing atxn {atxn_id}")
-          // atxn_res = atxn_factory[f"atxn_{atxn_id}"].execute(algorand.client.algod, 2)
-
-          // Send transaction that calls the purgeBoxStorage method and purge current batch of box keys
-        }
-      }),
-    )
-  }
-
-  async purgeBoxStorage(creator: string, appId: bigint) {
-    const client = this.getAppClient(appId)
-    const appBoxes = await this.algorand.client.algod.getApplicationBoxes(Number(appId)).do()
-
-    // Declare array to hold string box keys associated with non-creator addresses
-    const boxKeysAddresses: string[] = []
-    // Iterate over all the boxes retrieved from the algosdk Algod API
-    for (const box of appBoxes.boxes) {
-      // Ensure the box has a name property
-      if (box.name) {
-        // Extract last 32 bytes and encode them to get valid Algorand account address in Base32 format
-        const address = encodeAddress(box.name.slice(-32))
-        // If address does not match the creator's address, put it in `boxKeysAddresses` array
         if (address !== creator) {
           boxKeysAddresses.push(address)
         }
       }
     }
 
-    // Declare array to store batches of up to 8 Uint8Array box keys each
+    // Create batches of 8 box keys
     const boxKeyBatches: Uint8Array[][] = []
-    // Iterate over `boxKeysAddresses` in steps of 8 (i = start index for each batch of 8 box keys)
     for (let i = 0; i < boxKeysAddresses.length; i += 8) {
-      // Decode addresses and convert them to Uint8Array
-      const batchPromises = boxKeysAddresses.slice(i, i + 8).map(async (key) => {
-        return decodeAddress(key).publicKey
-      })
+      const batchPromises = boxKeysAddresses.slice(i, i + 8).map(async (key) => decodeAddress(key).publicKey)
 
       // Wait for all promises in the batch to resolve
       const batch = await Promise.all(batchPromises)
       boxKeyBatches.push(batch)
     }
 
-    // Process batches in parallel
-    await Promise.all(
-      boxKeyBatches.map(async (batch) => {
-        // Proceed only if the batch is not empty
-        if (batch) {
-          const boxNames = batch.map((boxKey) => new Uint8Array([...Buffer.from('a_'), ...boxKey]))
+    // Initialize AtomicTransactionComposer instances
+    const atxnFactory: { [key: string]: AtomicTransactionComposer } = {}
+    const numComposers = Math.ceil(boxKeyBatches.length / 2)
+    for (let i = 0; i < numComposers; i++) {
+      atxnFactory[`atxn_${i + 1}`] = new AtomicTransactionComposer()
+    }
 
-          // Send transaction that calls the purgeBoxStorage method and purge current batch of box keys
-          await client.send.purgeBoxStorage({
-            sender: creator,
-            signer: this.getSigner(creator),
-            boxReferences: boxNames.map((name) => ({ appId, name })),
-            args: { boxKeys: batch.map((key) => encodeAddress(key)) }, // Pass the batch of box keys as an array of strings
-          })
+    // Process batches
+    let batchCounter = 0
+    for (const batch of boxKeyBatches) {
+      const atxnId = Math.floor(batchCounter / 2) + 1
+      const boxNames = batch.map((boxKey) => new Uint8Array([...Buffer.from('a_'), ...boxKey]))
+
+      // Add method call to AtomicTransactionComposer
+      atxnFactory[`atxn_${atxnId}`].addMethodCall({
+        appID,
+        method: ABIMethod.fromSignature(client.appClient.getABIMethod('purge_box_storage').getSignature()),
+        methodArgs: [batch],
+        sender: creator,
+        suggestedParams: await this.algorand.getSuggestedParams(),
+        boxes: boxNames.map((name) => ({ appIndex: appID, name })),
+        signer: this.getSigner(creator),
+      })
+
+      // Execute every 2 batches or at the end
+      if (batchCounter % 2 === 1 || batchCounter === boxKeyBatches.length - 1) {
+        const atxnRes = await atxnFactory[`atxn_${atxnId}`].execute(this.algorand.client.algod, 5)
+        if (!atxnRes.confirmedRound) {
+          throw new Error('Atomic transaction round confirmation failed.')
         }
-      }),
-    )
+      }
+
+      batchCounter++
+    }
   }
 
   /**
@@ -694,98 +638,3 @@ export class OpenBallotMethodManager {
     })
   }
 }
-
-/**
- * Clears the local state associated with the given application (appId) for the specified sender account.
- *
- * This method uses the application client (`getAppClient`) to send a `clearState` transaction.
- * Clearing the local state allows the sender to reclaim the Minimum Balance Requirement (MBR) associated with
- * the application's local state from their account, effectively removing any application-specific data stored for them.
- *
- * @param sender - The address of the account that is clearing the local state for the specified application.
- * @param appId - The unique identifier of the application whose local state is being cleared for the sender.
- *
- * Steps:
- * 1. Retrieve the application client for the specified appId using `getAppClient`.
- * 2. Send a `clearState` transaction using the sender's account, which:
- *    - Removes the application's local state data from the sender's account.
- *    - Frees up the associated MBR, reducing the sender's minimum balance requirement.
- */
-// async clearState(sender: string, appId: bigint) {
-//   // Retrieve the application client for the specified application ID.
-//   const client = this.getAppClient(appId)
-
-//   // Send the clearState transaction using the specified sender's address.
-//   await client.send.clearState({
-//     sender, // Sender account clears the local state for the application.
-//     signer: this.getSigner(sender), // The signer for the sender's transactions.
-//   })
-// }
-
-//
-// /**
-//  * Opts the sender account into the application's local storage (appId).
-//  *
-//  * This method allows an account to opt into the application's local state, enabling the account
-//  * to participate in the application's operations, such as voting or accessing other app features.
-//  * It uses the application client (`getAppClient`) to send an `optIn.localStorage` transaction.
-//  *
-//  * Important Notes:
-//  * - Opting in increases the sender's Minimum Balance Requirement (MBR) due to the allocation of local storage.
-//  * - The sender must have sufficient funds to meet the MBR increase after opting in.
-//  * - The app creator does not need to opt in to their own application.
-//  *
-//  * @param sender - The address of the account opting into the application.
-//  * @param appId - The unique identifier of the application to which the sender is opting in.
-//  *
-//  * Steps:
-//  * 1. Retrieve the application client for the specified appId using `getAppClient`.
-//  * 2. Send an `optIn.localStorage` transaction using the sender's account, which:
-//  *    - Allocates local storage for the application in the sender's account.
-//  *    - Ensures the transaction is signed by the sender.
-//  */
-// async optIn(sender: string, appId: bigint) {
-//   // Retrieve the application client for the specified application ID.
-//   const client = this.getAppClient(appId)
-
-//   // Send the opt-in transaction using the sender's account.
-//   await client.send.optIn.localStorage({
-//     sender, // The address of the account opting into the application's local state.
-//     signer: this.getSigner(sender), // The signer for the sender's transactions.
-//     args: { account: sender }, // Includes the sender's account address.
-//   })
-// }
-
-// /**
-//  * Opts the sender account out of the application's local storage (appId).
-//  *
-//  * This method allows an account to opt out of the application's local state, releasing the allocated
-//  * local storage and reducing the sender's Minimum Balance Requirement (MBR). It uses the application client
-//  * (`getAppClient`) to send a `closeOut.optOut` transaction.
-//  *
-//  * Important Notes:
-//  * - Opting out will remove any local state data associated with the sender's account for the application.
-//  * - The sender must not have any pending interactions with the app (e.g., locked funds or active operations).
-//  * - Opting out reduces the sender's MBR, effectively freeing up the associated balance.
-//  *
-//  * @param sender - The address of the account opting out of the application.
-//  * @param appId - The unique identifier of the application from which the sender is opting out.
-//  *
-//  * Steps:
-//  * 1. Retrieve the application client for the specified appId using `getAppClient`.
-//  * 2. Send a `closeOut.optOut` transaction using the sender's account, which:
-//  *    - Removes the application's local state from the sender's account.
-//  *    - Reduces the sender's MBR, freeing up the previously allocated balance.
-//  *    - Ensures the transaction is signed by the sender.
-//  */
-// async optOut(sender: string, appId: bigint) {
-//   // Retrieve the application client for the specified application ID.
-//   const client = this.getAppClient(appId)
-
-//   // Send the opt-out transaction using the sender's account.
-//   await client.send.closeOut.optOut({
-//     sender, // The address of the account opting out of the application's local state.
-//     signer: this.getSigner(sender), // The signer for the sender's transactions.
-//     args: { account: sender }, // Includes the sender's account address.
-//   })
-// }

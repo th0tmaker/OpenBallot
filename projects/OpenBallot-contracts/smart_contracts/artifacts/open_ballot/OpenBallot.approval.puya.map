@@ -3,7 +3,7 @@
   "sources": [
     "../../open_ballot/contract.py"
   ],
-  "mappings": "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",
+  "mappings": "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",
   "op_pc_offset": 2,
   "pc_events": {
     "0": {
@@ -3240,26 +3240,6 @@
       ]
     },
     "793": {
-      "op": "pushbytes \"Account gets app box storage MBR (0.0169 ALGO) refunded.\"",
-      "defined_out": [
-        "\"Account gets app box storage MBR (0.0169 ALGO) refunded.\"",
-        "inner_txn_params%0%%param_Receiver_idx_0#0",
-        "inner_txn_params%0%%param_Sender_idx_0#0"
-      ],
-      "stack_out": [
-        "inner_txn_params%0%%param_Sender_idx_0#0",
-        "inner_txn_params%0%%param_Receiver_idx_0#0",
-        "\"Account gets app box storage MBR (0.0169 ALGO) refunded.\""
-      ]
-    },
-    "851": {
-      "op": "itxn_field Note",
-      "stack_out": [
-        "inner_txn_params%0%%param_Sender_idx_0#0",
-        "inner_txn_params%0%%param_Receiver_idx_0#0"
-      ]
-    },
-    "853": {
       "op": "pushint 15900 // 15900",
       "defined_out": [
         "15900",
@@ -3272,24 +3252,24 @@
         "15900"
       ]
     },
-    "856": {
+    "796": {
       "op": "itxn_field Amount",
       "stack_out": [
         "inner_txn_params%0%%param_Sender_idx_0#0",
         "inner_txn_params%0%%param_Receiver_idx_0#0"
       ]
     },
-    "858": {
+    "798": {
       "op": "itxn_field Receiver",
       "stack_out": [
         "inner_txn_params%0%%param_Sender_idx_0#0"
       ]
     },
-    "860": {
+    "800": {
       "op": "itxn_field Sender",
       "stack_out": []
     },
-    "862": {
+    "802": {
       "op": "intc_0 // pay",
       "defined_out": [
         "pay"
@@ -3298,11 +3278,11 @@
         "pay"
       ]
     },
-    "863": {
+    "803": {
       "op": "itxn_field TypeEnum",
       "stack_out": []
     },
-    "865": {
+    "805": {
       "op": "intc_3 // 1000",
       "defined_out": [
         "1000"
@@ -3311,20 +3291,20 @@
         "1000"
       ]
     },
-    "866": {
+    "806": {
       "op": "itxn_field Fee",
       "stack_out": []
     },
-    "868": {
+    "808": {
       "op": "itxn_submit"
     },
-    "869": {
+    "809": {
       "op": "itxn Receiver"
     },
-    "871": {
+    "811": {
       "op": "itxn Sender"
     },
-    "873": {
+    "813": {
       "op": "global CurrentApplicationAddress",
       "defined_out": [
         "box_storage_del_refund_itxn.Receiver#0",
@@ -3337,7 +3317,7 @@
         "tmp%8#0"
       ]
     },
-    "875": {
+    "815": {
       "op": "==",
       "defined_out": [
         "box_storage_del_refund_itxn.Receiver#0",
@@ -3348,14 +3328,14 @@
         "tmp%9#0"
       ]
     },
-    "876": {
+    "816": {
       "error": "box_storage_del_refund_itxn sender address must match application address.",
       "op": "assert // box_storage_del_refund_itxn sender address must match application address.",
       "stack_out": [
         "box_storage_del_refund_itxn.Receiver#0"
       ]
     },
-    "877": {
+    "817": {
       "op": "txn Sender",
       "defined_out": [
         "box_storage_del_refund_itxn.Receiver#0",
@@ -3366,7 +3346,7 @@
         "tmp%10#0"
       ]
     },
-    "879": {
+    "819": {
       "op": "==",
       "defined_out": [
         "tmp%11#0"
@@ -3375,16 +3355,16 @@
         "tmp%11#0"
       ]
     },
-    "880": {
+    "820": {
       "error": "box_storage_del_refund_itxn reciever address must match transaction sender address.",
       "op": "assert // box_storage_del_refund_itxn reciever address must match transaction sender address.",
       "stack_out": []
     },
-    "881": {
+    "821": {
       "retsub": true,
       "op": "retsub"
     },
-    "882": {
+    "822": {
       "subroutine": "smart_contracts.open_ballot.contract.OpenBallot.purge_box_storage",
       "params": {
         "box_keys#0": "bytes"
@@ -3393,13 +3373,13 @@
       "stack_in": [],
       "op": "proto 1 0"
     },
-    "885": {
+    "825": {
       "op": "pushbytes \"\""
     },
-    "887": {
+    "827": {
       "op": "txn Sender"
     },
-    "889": {
+    "829": {
       "op": "global CreatorAddress",
       "defined_out": [
         "tmp%0#0",
@@ -3411,7 +3391,7 @@
         "tmp%1#0"
       ]
     },
-    "891": {
+    "831": {
       "op": "==",
       "defined_out": [
         "tmp%2#0"
@@ -3421,14 +3401,14 @@
         "tmp%2#0"
       ]
     },
-    "892": {
+    "832": {
       "error": "Unauthorized address! Only application creator can purge box storage.",
       "op": "assert // Unauthorized address! Only application creator can purge box storage.",
       "stack_out": [
         "item_index_internal%0#0"
       ]
     },
-    "893": {
+    "833": {
       "op": "frame_dig -1",
       "defined_out": [
         "box_keys#0 (copy)"
@@ -3438,7 +3418,7 @@
         "box_keys#0 (copy)"
       ]
     },
-    "895": {
+    "835": {
       "op": "intc_1 // 0",
       "defined_out": [
         "0",
@@ -3450,7 +3430,7 @@
         "0"
       ]
     },
-    "896": {
+    "836": {
       "op": "extract_uint16",
       "defined_out": [
         "tmp%3#0"
@@ -3460,7 +3440,7 @@
         "tmp%3#0"
       ]
     },
-    "897": {
+    "837": {
       "op": "dup",
       "defined_out": [
         "tmp%3#0"
@@ -3471,29 +3451,29 @@
         "tmp%3#0"
       ]
     },
-    "898": {
+    "838": {
       "op": "bz purge_box_storage_bool_false@3",
       "stack_out": [
         "item_index_internal%0#0",
         "tmp%3#0"
       ]
     },
-    "901": {
+    "841": {
       "op": "frame_dig 1"
     },
-    "903": {
+    "843": {
       "op": "pushint 9 // 9"
     },
-    "905": {
+    "845": {
       "op": "<"
     },
-    "906": {
+    "846": {
       "op": "bz purge_box_storage_bool_false@3"
     },
-    "909": {
+    "849": {
       "op": "intc_0 // 1"
     },
-    "910": {
+    "850": {
       "block": "purge_box_storage_bool_merge@4",
       "stack_in": [
         "item_index_internal%0#0",
@@ -3508,7 +3488,7 @@
         "tmp%3#0"
       ]
     },
-    "911": {
+    "851": {
       "op": "intc_1 // 0",
       "defined_out": [
         "item_index_internal%0#0"
@@ -3519,7 +3499,7 @@
         "item_index_internal%0#0"
       ]
     },
-    "912": {
+    "852": {
       "op": "frame_bury 0",
       "defined_out": [
         "item_index_internal%0#0"
@@ -3529,7 +3509,7 @@
         "tmp%3#0"
       ]
     },
-    "914": {
+    "854": {
       "block": "purge_box_storage_for_header@5",
       "stack_in": [
         "item_index_internal%0#0",
@@ -3545,7 +3525,7 @@
         "item_index_internal%0#0"
       ]
     },
-    "916": {
+    "856": {
       "op": "frame_dig 1",
       "defined_out": [
         "item_index_internal%0#0",
@@ -3558,7 +3538,7 @@
         "tmp%3#0"
       ]
     },
-    "918": {
+    "858": {
       "op": "<",
       "defined_out": [
         "continue_looping%0#0",
@@ -3571,123 +3551,123 @@
         "continue_looping%0#0"
       ]
     },
-    "919": {
+    "859": {
       "op": "bz purge_box_storage_after_for@8",
       "stack_out": [
         "item_index_internal%0#0",
         "tmp%3#0"
       ]
     },
-    "922": {
+    "862": {
       "op": "frame_dig -1"
     },
-    "924": {
+    "864": {
       "op": "extract 2 0"
     },
-    "927": {
+    "867": {
       "op": "frame_dig 0"
     },
-    "929": {
+    "869": {
       "op": "dup"
     },
-    "930": {
+    "870": {
       "op": "cover 2"
     },
-    "932": {
+    "872": {
       "op": "pushint 32 // 32"
     },
-    "934": {
+    "874": {
       "op": "*"
     },
-    "935": {
+    "875": {
       "op": "pushint 32 // 32"
     },
-    "937": {
+    "877": {
       "error": "Index access is out of bounds",
       "op": "extract3 // on error: Index access is out of bounds"
     },
-    "938": {
+    "878": {
       "op": "bytec_0 // 0x615f"
     },
-    "939": {
+    "879": {
       "op": "dig 1"
     },
-    "941": {
+    "881": {
       "op": "concat"
     },
-    "942": {
+    "882": {
       "op": "dup"
     },
-    "943": {
+    "883": {
       "op": "box_len"
     },
-    "944": {
+    "884": {
       "op": "bury 1"
     },
-    "946": {
+    "886": {
       "error": "Account address represented in box key must be present in box a_.",
       "op": "assert // Account address represented in box key must be present in box a_."
     },
-    "947": {
+    "887": {
       "op": "global CreatorAddress"
     },
-    "949": {
+    "889": {
       "op": "uncover 2"
     },
-    "951": {
+    "891": {
       "op": "!="
     },
-    "952": {
+    "892": {
       "error": "Account address represented in box key must not match application creator address.",
       "op": "assert // Account address represented in box key must not match application creator address."
     },
-    "953": {
+    "893": {
       "op": "box_del"
     },
-    "954": {
+    "894": {
       "op": "pop"
     },
-    "955": {
+    "895": {
       "op": "intc_1 // 0"
     },
-    "956": {
+    "896": {
       "op": "bytec_1 // \"total_purged_box_a_\""
     },
-    "957": {
+    "897": {
       "op": "app_global_get_ex"
     },
-    "958": {
+    "898": {
       "error": "check self.total_purged_box_a_ exists",
       "op": "assert // check self.total_purged_box_a_ exists"
     },
-    "959": {
+    "899": {
       "op": "intc_0 // 1"
     },
-    "960": {
+    "900": {
       "op": "+"
     },
-    "961": {
+    "901": {
       "op": "bytec_1 // \"total_purged_box_a_\""
     },
-    "962": {
+    "902": {
       "op": "swap"
     },
-    "963": {
+    "903": {
       "op": "app_global_put"
     },
-    "964": {
+    "904": {
       "op": "intc_0 // 1"
     },
-    "965": {
+    "905": {
       "op": "+"
     },
-    "966": {
+    "906": {
       "op": "frame_bury 0"
     },
-    "968": {
+    "908": {
       "op": "b purge_box_storage_for_header@5"
     },
-    "971": {
+    "911": {
       "block": "purge_box_storage_after_for@8",
       "stack_in": [
         "item_index_internal%0#0",
@@ -3696,7 +3676,7 @@
       "retsub": true,
       "op": "retsub"
     },
-    "972": {
+    "912": {
       "block": "purge_box_storage_bool_false@3",
       "stack_in": [
         "item_index_internal%0#0",
@@ -3712,30 +3692,30 @@
         "and_result%0#0"
       ]
     },
-    "973": {
+    "913": {
       "op": "b purge_box_storage_bool_merge@4"
     },
-    "976": {
+    "916": {
       "subroutine": "smart_contracts.open_ballot.contract.OpenBallot.terminate",
       "params": {},
       "block": "terminate",
       "stack_in": [],
       "op": "proto 0 0"
     },
-    "979": {
+    "919": {
       "op": "intc_1 // 0",
       "stack_out": [
         "del_app_refund_itxn.CloseRemainderTo#0"
       ]
     },
-    "980": {
+    "920": {
       "op": "dup",
       "stack_out": [
         "del_app_refund_itxn.CloseRemainderTo#0",
         "del_app_refund_itxn.Receiver#0"
       ]
     },
-    "981": {
+    "921": {
       "op": "intc 5 // TMPL_DELETABLE",
       "defined_out": [
         "TMPL_DELETABLE"
@@ -3746,7 +3726,7 @@
         "TMPL_DELETABLE"
       ]
     },
-    "983": {
+    "923": {
       "error": "Template variable 'DELETABLE' needs to be 'True' at deploy-time.",
       "op": "assert // Template variable 'DELETABLE' needs to be 'True' at deploy-time.",
       "stack_out": [
@@ -3754,10 +3734,10 @@
         "del_app_refund_itxn.Receiver#0"
       ]
     },
-    "984": {
+    "924": {
       "op": "txn Sender"
     },
-    "986": {
+    "926": {
       "op": "global CreatorAddress",
       "defined_out": [
         "tmp%1#0",
@@ -3770,7 +3750,7 @@
         "tmp%2#0"
       ]
     },
-    "988": {
+    "928": {
       "op": "==",
       "defined_out": [
         "tmp%3#0"
@@ -3781,7 +3761,7 @@
         "tmp%3#0"
       ]
     },
-    "989": {
+    "929": {
       "error": "Unauthorized address! Only application creator can delete the smart contract.",
       "op": "assert // Unauthorized address! Only application creator can delete the smart contract.",
       "stack_out": [
@@ -3789,10 +3769,10 @@
         "del_app_refund_itxn.Receiver#0"
       ]
     },
-    "990": {
+    "930": {
       "op": "bytec_0 // 0x615f"
     },
-    "991": {
+    "931": {
       "op": "global CreatorAddress",
       "defined_out": [
         "0x615f",
@@ -3805,7 +3785,7 @@
         "tmp%4#0"
       ]
     },
-    "993": {
+    "933": {
       "op": "concat",
       "defined_out": [
         "tmp%5#0"
@@ -3816,7 +3796,7 @@
         "tmp%5#0"
       ]
     },
-    "994": {
+    "934": {
       "op": "box_len",
       "defined_out": [
         "maybe_exists%0#0",
@@ -3829,7 +3809,7 @@
         "maybe_exists%0#0"
       ]
     },
-    "995": {
+    "935": {
       "op": "bury 1",
       "stack_out": [
         "del_app_refund_itxn.CloseRemainderTo#0",
@@ -3837,7 +3817,7 @@
         "maybe_exists%0#0"
       ]
     },
-    "997": {
+    "937": {
       "error": "Transaction sender address must be present in box a_.",
       "op": "assert // Transaction sender address must be present in box a_.",
       "stack_out": [
@@ -3845,10 +3825,10 @@
         "del_app_refund_itxn.Receiver#0"
       ]
     },
-    "998": {
+    "938": {
       "op": "bytec_0 // 0x615f"
     },
-    "999": {
+    "939": {
       "op": "global CreatorAddress",
       "defined_out": [
         "0x615f",
@@ -3861,7 +3841,7 @@
         "tmp%6#0"
       ]
     },
-    "1001": {
+    "941": {
       "op": "concat",
       "defined_out": [
         "tmp%7#0"
@@ -3872,7 +3852,7 @@
         "tmp%7#0"
       ]
     },
-    "1002": {
+    "942": {
       "op": "box_del",
       "defined_out": [
         "{box_del}"
@@ -3883,14 +3863,14 @@
         "{box_del}"
       ]
     },
-    "1003": {
+    "943": {
       "op": "pop",
       "stack_out": [
         "del_app_refund_itxn.CloseRemainderTo#0",
         "del_app_refund_itxn.Receiver#0"
       ]
     },
-    "1004": {
+    "944": {
       "op": "intc_1 // 0",
       "defined_out": [
         "0"
@@ -3901,7 +3881,7 @@
         "0"
       ]
     },
-    "1005": {
+    "945": {
       "op": "bytec_1 // \"total_purged_box_a_\"",
       "defined_out": [
         "\"total_purged_box_a_\"",
@@ -3914,7 +3894,7 @@
         "\"total_purged_box_a_\""
       ]
     },
-    "1006": {
+    "946": {
       "op": "app_global_get_ex",
       "defined_out": [
         "maybe_exists%1#0",
@@ -3927,7 +3907,7 @@
         "maybe_exists%1#0"
       ]
     },
-    "1007": {
+    "947": {
       "error": "check self.total_purged_box_a_ exists",
       "op": "assert // check self.total_purged_box_a_ exists",
       "stack_out": [
@@ -3936,99 +3916,93 @@
         "maybe_value%1#0"
       ]
     },
-    "1008": {
+    "948": {
       "op": "bz terminate_else_body@3",
       "stack_out": [
         "del_app_refund_itxn.CloseRemainderTo#0",
         "del_app_refund_itxn.Receiver#0"
       ]
     },
-    "1011": {
+    "951": {
       "op": "itxn_begin"
     },
-    "1012": {
+    "952": {
       "op": "global CurrentApplicationAddress"
     },
-    "1014": {
+    "954": {
       "op": "global CreatorAddress"
     },
-    "1016": {
+    "956": {
       "op": "intc_1 // 0"
     },
-    "1017": {
+    "957": {
       "op": "bytec_1 // \"total_purged_box_a_\""
     },
-    "1018": {
+    "958": {
       "op": "app_global_get_ex"
     },
-    "1019": {
+    "959": {
       "error": "check self.total_purged_box_a_ exists",
       "op": "assert // check self.total_purged_box_a_ exists"
     },
-    "1020": {
+    "960": {
       "op": "intc_2 // 16900"
     },
-    "1021": {
+    "961": {
       "op": "*"
     },
-    "1022": {
+    "962": {
       "op": "intc_3 // 1000"
     },
-    "1023": {
+    "963": {
       "op": "-"
     },
-    "1024": {
+    "964": {
       "op": "global CreatorAddress"
     },
-    "1026": {
-      "op": "pushbytes \"Closed remainder of app balance + purged box storage amount to Creator after deletion method.\""
-    },
-    "1121": {
-      "op": "itxn_field Note"
-    },
-    "1123": {
+    "966": {
       "op": "itxn_field CloseRemainderTo"
     },
-    "1125": {
+    "968": {
       "op": "itxn_field Amount"
     },
-    "1127": {
+    "970": {
       "op": "itxn_field Receiver"
     },
-    "1129": {
+    "972": {
       "op": "itxn_field Sender"
     },
-    "1131": {
+    "974": {
       "op": "intc_0 // pay"
     },
-    "1132": {
+    "975": {
       "op": "itxn_field TypeEnum"
     },
-    "1134": {
+    "977": {
       "op": "intc_3 // 1000"
     },
-    "1135": {
+    "978": {
       "op": "itxn_field Fee"
     },
-    "1137": {
+    "980": {
       "op": "itxn_submit"
     },
-    "1138": {
+    "981": {
       "op": "itxn Sender"
     },
-    "1140": {
+    "983": {
       "op": "itxn Receiver"
     },
-    "1142": {
+    "985": {
       "op": "frame_bury 1"
     },
-    "1144": {
+    "987": {
       "op": "itxn CloseRemainderTo"
     },
-    "1146": {
+    "989": {
       "op": "frame_bury 0"
     },
-    "1148": {
+    "991": {
       "block": "terminate_after_if_else@5",
       "stack_in": [
         "del_app_refund_itxn.CloseRemainderTo#0",
@@ -4047,7 +4021,7 @@
         "tmp%11#0"
       ]
     },
-    "1150": {
+    "993": {
       "op": "==",
       "defined_out": [
         "tmp%12#0"
@@ -4058,7 +4032,7 @@
         "tmp%12#0"
       ]
     },
-    "1151": {
+    "994": {
       "error": "del_app_refund_itxn 'sender' address must match Application address.",
       "op": "assert // del_app_refund_itxn 'sender' address must match Application address.",
       "stack_out": [
@@ -4066,10 +4040,10 @@
         "del_app_refund_itxn.Receiver#0"
       ]
     },
-    "1152": {
+    "995": {
       "op": "frame_dig 1"
     },
-    "1154": {
+    "997": {
       "op": "global ZeroAddress",
       "defined_out": [
         "del_app_refund_itxn.Receiver#0",
@@ -4082,7 +4056,7 @@
         "tmp%13#0"
       ]
     },
-    "1156": {
+    "999": {
       "op": "!=",
       "defined_out": [
         "del_app_refund_itxn.Receiver#0",
@@ -4094,29 +4068,29 @@
         "tmp%14#0"
       ]
     },
-    "1157": {
+    "1000": {
       "op": "bz terminate_bool_false@8",
       "stack_out": [
         "del_app_refund_itxn.CloseRemainderTo#0",
         "del_app_refund_itxn.Receiver#0"
       ]
     },
-    "1160": {
+    "1003": {
       "op": "frame_dig 0"
     },
-    "1162": {
+    "1005": {
       "op": "global CreatorAddress"
     },
-    "1164": {
+    "1007": {
       "op": "=="
     },
-    "1165": {
+    "1008": {
       "op": "bz terminate_bool_false@8"
     },
-    "1168": {
+    "1011": {
       "op": "intc_0 // 1"
     },
-    "1169": {
+    "1012": {
       "block": "terminate_bool_merge@9",
       "stack_in": [
         "del_app_refund_itxn.CloseRemainderTo#0",
@@ -4131,11 +4105,11 @@
         "del_app_refund_itxn.Receiver#0"
       ]
     },
-    "1170": {
+    "1013": {
       "retsub": true,
       "op": "retsub"
     },
-    "1171": {
+    "1014": {
       "block": "terminate_bool_false@8",
       "stack_in": [
         "del_app_refund_itxn.CloseRemainderTo#0",
@@ -4151,10 +4125,10 @@
         "and_result%0#0"
       ]
     },
-    "1172": {
+    "1015": {
       "op": "b terminate_bool_merge@9"
     },
-    "1175": {
+    "1018": {
       "block": "terminate_else_body@3",
       "stack_in": [
         "del_app_refund_itxn.CloseRemainderTo#0",
@@ -4162,7 +4136,7 @@
       ],
       "op": "itxn_begin"
     },
-    "1176": {
+    "1019": {
       "op": "global CurrentApplicationAddress",
       "defined_out": [
         "inner_txn_params%1%%param_Sender_idx_0#0"
@@ -4173,7 +4147,7 @@
         "inner_txn_params%1%%param_Sender_idx_0#0"
       ]
     },
-    "1178": {
+    "1021": {
       "op": "global CreatorAddress",
       "defined_out": [
         "inner_txn_params%1%%param_Receiver_idx_0#0",
@@ -4186,7 +4160,7 @@
         "inner_txn_params%1%%param_Receiver_idx_0#0"
       ]
     },
-    "1180": {
+    "1023": {
       "op": "dup",
       "defined_out": [
         "inner_txn_params%1%%param_CloseRemainderTo_idx_0#0",
@@ -4201,34 +4175,7 @@
         "inner_txn_params%1%%param_CloseRemainderTo_idx_0#0"
       ]
     },
-    "1181": {
-      "op": "pushbytes \"Closing remainder of app balance to Creator after deletion method.\"",
-      "defined_out": [
-        "\"Closing remainder of app balance to Creator after deletion method.\"",
-        "inner_txn_params%1%%param_CloseRemainderTo_idx_0#0",
-        "inner_txn_params%1%%param_Receiver_idx_0#0",
-        "inner_txn_params%1%%param_Sender_idx_0#0"
-      ],
-      "stack_out": [
-        "del_app_refund_itxn.CloseRemainderTo#0",
-        "del_app_refund_itxn.Receiver#0",
-        "inner_txn_params%1%%param_Sender_idx_0#0",
-        "inner_txn_params%1%%param_Receiver_idx_0#0",
-        "inner_txn_params%1%%param_CloseRemainderTo_idx_0#0",
-        "\"Closing remainder of app balance to Creator after deletion method.\""
-      ]
-    },
-    "1249": {
-      "op": "itxn_field Note",
-      "stack_out": [
-        "del_app_refund_itxn.CloseRemainderTo#0",
-        "del_app_refund_itxn.Receiver#0",
-        "inner_txn_params%1%%param_Sender_idx_0#0",
-        "inner_txn_params%1%%param_Receiver_idx_0#0",
-        "inner_txn_params%1%%param_CloseRemainderTo_idx_0#0"
-      ]
-    },
-    "1251": {
+    "1024": {
       "op": "itxn_field CloseRemainderTo",
       "stack_out": [
         "del_app_refund_itxn.CloseRemainderTo#0",
@@ -4237,7 +4184,7 @@
         "inner_txn_params%1%%param_Receiver_idx_0#0"
       ]
     },
-    "1253": {
+    "1026": {
       "op": "intc_1 // 0",
       "defined_out": [
         "0",
@@ -4252,7 +4199,7 @@
         "0"
       ]
     },
-    "1254": {
+    "1027": {
       "op": "itxn_field Amount",
       "stack_out": [
         "del_app_refund_itxn.CloseRemainderTo#0",
@@ -4261,7 +4208,7 @@
         "inner_txn_params%1%%param_Receiver_idx_0#0"
       ]
     },
-    "1256": {
+    "1029": {
       "op": "itxn_field Receiver",
       "stack_out": [
         "del_app_refund_itxn.CloseRemainderTo#0",
@@ -4269,14 +4216,14 @@
         "inner_txn_params%1%%param_Sender_idx_0#0"
       ]
     },
-    "1258": {
+    "1031": {
       "op": "itxn_field Sender",
       "stack_out": [
         "del_app_refund_itxn.CloseRemainderTo#0",
         "del_app_refund_itxn.Receiver#0"
       ]
     },
-    "1260": {
+    "1033": {
       "op": "intc_0 // pay",
       "defined_out": [
         "pay"
@@ -4287,14 +4234,14 @@
         "pay"
       ]
     },
-    "1261": {
+    "1034": {
       "op": "itxn_field TypeEnum",
       "stack_out": [
         "del_app_refund_itxn.CloseRemainderTo#0",
         "del_app_refund_itxn.Receiver#0"
       ]
     },
-    "1263": {
+    "1036": {
       "op": "intc_3 // 1000",
       "defined_out": [
         "1000"
@@ -4305,20 +4252,20 @@
         "1000"
       ]
     },
-    "1264": {
+    "1037": {
       "op": "itxn_field Fee",
       "stack_out": [
         "del_app_refund_itxn.CloseRemainderTo#0",
         "del_app_refund_itxn.Receiver#0"
       ]
     },
-    "1266": {
+    "1039": {
       "op": "itxn_submit"
     },
-    "1267": {
+    "1040": {
       "op": "itxn Sender"
     },
-    "1269": {
+    "1042": {
       "op": "itxn Receiver",
       "defined_out": [
         "del_app_refund_itxn.Receiver#0",
@@ -4331,7 +4278,7 @@
         "del_app_refund_itxn.Receiver#0"
       ]
     },
-    "1271": {
+    "1044": {
       "op": "frame_bury 1",
       "defined_out": [
         "del_app_refund_itxn.Receiver#0",
@@ -4343,7 +4290,7 @@
         "del_app_refund_itxn.Sender#0"
       ]
     },
-    "1273": {
+    "1046": {
       "op": "itxn CloseRemainderTo",
       "defined_out": [
         "del_app_refund_itxn.CloseRemainderTo#0",
@@ -4357,7 +4304,7 @@
         "del_app_refund_itxn.CloseRemainderTo#0"
       ]
     },
-    "1275": {
+    "1048": {
       "op": "frame_bury 0",
       "defined_out": [
         "del_app_refund_itxn.CloseRemainderTo#0",
@@ -4370,7 +4317,7 @@
         "del_app_refund_itxn.Sender#0"
       ]
     },
-    "1277": {
+    "1050": {
       "op": "b terminate_after_if_else@5"
     }
   }

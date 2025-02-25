@@ -301,17 +301,6 @@ class OpenBallot(ARC4Contract):
         #     Global.latest_timestamp <= self.poll_end_date_unix
         # ), "Voting period has ended."
 
-        # assert account.is_opted_in(
-        #     Application(Global.current_application_id.id)
-        # ), "Account must be opted-in before voting."
-
-        # assert (
-        #     self.local_vote_status[account] == UInt64(0) and self.local_vote_choice[account] == UInt64(0)
-        # ), "This account already submitted a vote or have not opted-in yet."
-
-        # self.local_vote_choice[account] = choice  # Set account vote choice (choice selected)
-        # self.local_vote_status[account] = UInt64(1)  # Set account vote status (has voted)
-
         # Set account voter data
         self.box_a_voter_data[Txn.sender] = VoterData(arc4.UInt8(1), choice)
 
@@ -341,7 +330,7 @@ class OpenBallot(ARC4Contract):
         #     Global.latest_timestamp <= (self.poll_end_date_unix + UInt64(7 * 24 * 60 * 60))
         # ), "Box storage can only be deleted within a 7-day window after voting period is over."
 
-        # Delete box key (address) from box storage and decrement box 'a_' total amount
+        # Delete box key (address) from box storage
         del self.box_a_voter_data[Txn.sender]
 
         # Submit inner transaction (transaction sender gets their Box storage MBR refunded)
@@ -351,7 +340,6 @@ class OpenBallot(ARC4Contract):
             receiver=Txn.sender,
             amount=self.calc_box_storage_mbr() - min_txn_fee,
             fee=min_txn_fee,
-            note="Account gets app box storage MBR (0.0169 ALGO) refunded.",
         ).submit()
 
         assert (
@@ -374,10 +362,6 @@ class OpenBallot(ARC4Contract):
         # assert (
         #     Global.latest_timestamp >= (self.poll_end_date_unix + UInt64(7 * 24 * 60 * 60))
         # ), "Box storage purge only possible after voting period + 7-day box storage deletion window is over."
-
-        assert (
-            self.total_purged_box_a_== 0
-        ), "Unable to purge! Application creator has already purged box_a."
 
         assert (
             box_keys.length > 0 and box_keys.length < 9
@@ -422,11 +406,10 @@ class OpenBallot(ARC4Contract):
         #     Global.latest_timestamp >= (self.poll_end_date_unix + UInt64(7 * 24 * 60 * 60))
         # ), "App can only be deleted after voting period + 7-day box storage deletion window is over."
 
-        del self.box_a_voter_data[
-            Global.creator_address
-        ]  # Delete box key (creator address) from box storage
+        # Delete box key (creator address) from box storage
+        del self.box_a_voter_data[Global.creator_address]
 
-        # Define final closing app balance refund transaction
+        # Define final delete app refund transaction
         min_txn_fee = arc4.UInt16(1000).native  # Minimum acceptable fee for transaction
         if self.total_purged_box_a_ > UInt64(0):
             # Execute inner transaction payment with purge refund and close remainder
@@ -438,9 +421,6 @@ class OpenBallot(ARC4Contract):
                 ),
                 fee=min_txn_fee,
                 close_remainder_to=Global.creator_address,
-                note=(
-                    "Closed remainder of app balance + purged box storage amount to Creator after deletion method."
-                ),
             ).submit()
         else:
             # Execute inner transaction that only closes app remainder balance to the creator
@@ -450,7 +430,6 @@ class OpenBallot(ARC4Contract):
                 amount=UInt64(0),  # Send zero amount
                 fee=min_txn_fee,
                 close_remainder_to=Global.creator_address,
-                note="Closing remainder of app balance to Creator after deletion method.",
             ).submit()
 
         assert (
@@ -462,39 +441,4 @@ class OpenBallot(ARC4Contract):
             and del_app_refund_itxn.close_remainder_to == Global.creator_address
         ), "del_app_refund_itxn 'reciever' and 'close_remainder_to' address must match application Creator address."
 
-    # Allow any eligible account to opt in to the smart contract's local storage
-    # @arc4.abimethod(allow_actions=["OptIn"])
-    # def local_storage(self, account: Account) -> None:
-    #     # Make necessary assertions to verify transaction requirements
-    #     assert Txn.sender == account, "Transaction sender must match account address."
 
-    #     assert account.balance >= (
-    #         Global.min_balance
-    #         + self.calc_schema_mbr(
-    #             num_bytes=UInt64(0), num_uint=UInt64(2)
-    #         )  # Local schema MBR: 0.157 ALGO
-    #     ), "Account address balance must be equal or greater than Global.min_balance + Local schema MBR amount."
-
-    #     # Change local state var 'self.local_vote_status' (specific to account) value from 'None' to '0'
-    #     self.local_vote_status[account] = UInt64(0)
-
-    #     # Change local state var 'self.local_vote_choice' (specific to account) value from 'None' to '0'
-    #     self.local_vote_choice[account] = UInt64(0)
-
-    #     # Increment count for total accounts opted in
-    #     self.total_accounts_opted_in += UInt64(1)
-
-    # Allow any eligible account to opt out of the smart contract's local storage
-    # @arc4.abimethod(allow_actions=["CloseOut"])
-    # def opt_out(self, account: Account) -> None:
-    #     # Make necessary assertions to verify transaction requirements
-    #     assert account.is_opted_in(
-    #         Application(Global.current_application_id.id)
-    #     ), "Account must first be opted-in to App client in order to close out."
-
-    #     # Delete account local storage keys and their corresponding values
-    #     del self.local_vote_status[account]
-    #     del self.local_vote_choice[account]
-
-    #     # Decrement the total count of accounts that are opted in
-    #     self.total_accounts_opted_in -= UInt64(1)

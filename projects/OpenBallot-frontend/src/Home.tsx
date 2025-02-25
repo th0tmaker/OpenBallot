@@ -17,7 +17,7 @@ import * as date from './utils/dates'
 import * as pollInputs from './utils/pollInputs'
 
 // Algorand client setup
-const algorand = AlgorandClient.defaultLocalNet()
+const algorand = AlgorandClient.fromEnvironment()
 
 const Home: React.FC = () => {
   // Wallet Address & Signer
@@ -37,14 +37,6 @@ const Home: React.FC = () => {
   const [currentAppId, setCurrentAppId] = useState<bigint | null>(null) // Current App ID (for loading App Global State)
   const [currentAppClient, setCurrentAppClient] = useState<iInterface.AppClientProps | null>(null)
 
-  // const hasLoadedApp = useRef<{ [key: string]: boolean }>({})
-
-  // User Notification
-  const [userMsg, setUserMsg] = useState<{ msg: string; style: string }>({
-    msg: '',
-    style: '',
-  }) // Inform user with a status update message
-
   // Poll
   const [currentPollInputs, setCurrentPollInputs] = useState<iInterface.AppPollProps>({
     title: '',
@@ -53,9 +45,11 @@ const Home: React.FC = () => {
     endDate: '',
   }) // Store current poll data fields the user has provided as inputs
 
+  // User vote decision
   const [choiceDecision, setChoiceDecision] = useState<bigint | null>(null) // Store user choice decision
   const [choiceDisplay, setChoiceDisplay] = useState<{ index: number | null; text: string }>({ index: null, text: '' }) // Display choice on screen
 
+  // Voting period
   const [votingPeriod, setVotingPeriod] = useState({ open: false, msg: 'No' }) // Track if poll voting period is over
 
   // UI Section Display State
@@ -63,6 +57,12 @@ const Home: React.FC = () => {
 
   // Button State
   const { btnStates, updateBtnStates } = button.useBtnState() // Set and update the state of buttons
+
+  // User Notification
+  const [userMsg, setUserMsg] = useState<{ msg: string; style: string }>({
+    msg: '',
+    style: '',
+  }) // Inform user with a status update message
 
   // ==================================================
   // * EVENT LISTENER (manage lifecycle side-effects) *
@@ -76,7 +76,7 @@ const Home: React.FC = () => {
       const arePollInputsValid = pollInputs.processPollInputs(currentPollInputs, activeSection, setUserMsg)
       updateBtnStates({ pollInputsValid: arePollInputsValid }) // Update the button state accordingly
     }
-  }, [currentPollInputs, btnStates.pollInputsValid, activeSection === 'CREATION', setUserMsg])
+  }, [currentPollInputs, btnStates.pollInputsValid, activeSection === 'CREATION'])
 
   // Load App Client Global State
   useEffect(() => {
@@ -96,87 +96,11 @@ const Home: React.FC = () => {
     loadGlobalState() // Call method
   }, [currentAppId, activeSection == 'ENGAGEMENT']) // Trigger effect re-run based on the values of the variables it contains
 
-  // Load App Client Local State
-  // useEffect(() => {
-  //   const loadLocalState = async () => {
-  //     // Return and escape if no wallet active address found or App ID is null
-  //     if (!activeAddress || !currentAppClient?.appId) return
-
-  //     try {
-  //       // If wallet connected, proceed with loading App client State
-  //       const localState = await queryLocalState(currentAppClient.appId, activeAddress) // query account Local State on App client
-  //       consoleLogger.info(`Local State for App client with ID: ${currentAppClient.appId.toString()} has been loaded successfully!`)
-
-  //       if (localState) {
-  //         const { optedIn, localVoteStatus, localVoteChoice } = localState
-  //         // If account with active address has voted, display their vote choice on screen based on its corresponding number
-  //         if (localVoteStatus === 1) {
-  //           if (localVoteChoice === 1) {
-  //             setChoiceDisplay({ index: localVoteChoice, text: currentAppClient.pollChoice1 })
-  //           } else if (localVoteChoice === 2) {
-  //             setChoiceDisplay({ index: localVoteChoice, text: currentAppClient.pollChoice2 })
-  //           } else if (localVoteChoice === 3) {
-  //             setChoiceDisplay({ index: localVoteChoice, text: currentAppClient.pollChoice3 })
-  //           }
-  //         }
-
-  //         // Check voting status (if voting is open or closed)
-  //         const currentVotingPeriod = date.checkVotingPeriod(currentAppClient.pollStartDateUnix, currentAppClient.pollEndDateUnix)
-  //         setVotingPeriod(currentVotingPeriod) // Set 'votingPeriod'
-
-  //         consoleLogger.info('Voting Status:', currentVotingPeriod)
-
-  //         // Update the button states based on the Local State key-value pairs
-  //         updateBtnStates({
-  //           optedIn,
-  //           pollVotingPeriodOpen: currentVotingPeriod.open,
-  //           voteSubmitted: !optedIn || !currentVotingPeriod.open || localVoteStatus === 1,
-  //         })
-
-  //         // Update the 'currentAppClient' with the refreshed Local State values
-  //         const updatedAppClient = {
-  //           ...currentAppClient,
-  //           pollVoteStatus: localVoteStatus,
-  //           pollVoteChoice: localVoteChoice,
-  //           isOptedIn: optedIn,
-  //         }
-
-  //         // Pass 'updatedAppClient' as new 'currentAppClient'
-  //         setCurrentAppClient(updatedAppClient)
-  //         consoleLogger.info('LocaL State queried and updated with new values:', updatedAppClient)
-  //       }
-  //     } catch (error) {
-  //       consoleLogger.error(`Error loading Local State for App client with ID: ${currentAppClient.appId.toString()}!`, error)
-  //     }
-  //   }
-
-  //   loadLocalState()
-  // }, [activeAddress, currentAppClient?.isOptedIn])
-
-  // ================
-  // * MODAL EVENTS *
-  // ================
+  // =========
+  // * MODAL *
+  // =========
 
   // Toggle the state of selected modal
-
-  // Function to check the voting period status
-  const checkVotingStatus = () => {
-    if (currentAppClient && activeSection === 'ENGAGEMENT') {
-      const currentVotingPeriod = date.checkVotingPeriod(currentAppClient.pollStartDateUnix, currentAppClient.pollEndDateUnix)
-      if (currentVotingPeriod.open === votingPeriod.open) {
-        return // Return early if the voting period status hasn't changed
-      }
-
-      // Update votingPeriod and button state
-      setVotingPeriod(currentVotingPeriod)
-      consoleLogger.info('Voting Status:', currentVotingPeriod)
-
-      updateBtnStates({
-        pollVotingPeriodOpen: currentVotingPeriod.open,
-      })
-    }
-  }
-
   const toggleModal = (modal: keyof iInterface.ModalStateFlags, state?: boolean) => {
     setModals((prev) => ({
       ...prev,
@@ -184,13 +108,17 @@ const Home: React.FC = () => {
     }))
   }
 
+  // ============
+  // * JOIN APP *
+  // ============
+
   // Join existing App Client by passing the JoinApp modal App ID
   const handleJoinApp = async (appId: bigint): Promise<boolean | null> => {
     // Check if the active address exists
     if (!activeAddress) {
       consoleLogger.error('Broke out handleJoinApp: activeAddress not found!')
       setUserMsg({
-        msg: 'Can not proceed without establishing a wallet connection.',
+        msg: 'No active account found. Check wallet connection.',
         style: 'text-red-700 font-bold',
       })
       return null
@@ -199,11 +127,8 @@ const Home: React.FC = () => {
     try {
       consoleLogger.info(`Joining client with App ID: ${appId.toString()}!`)
 
-      // Set appId as 'currentAppId'
       setCurrentAppId(appId) // Pass App ID from JoinApp modal
-
       setActiveSection('ENGAGEMENT') // Switch UI section to engagement
-
       toggleModal('joinApp', false) // Close Join App modal
 
       return true // Successfully joined
@@ -213,39 +138,17 @@ const Home: React.FC = () => {
     }
   }
 
-  // // Execute Clear State on existing App Client by passing the ClearState in order to opt out and free up Local schema MBR without fail
-  // const onClearState = async (appId: bigint): Promise<boolean | null> => {
-  //   // Check if the active address exists
-  //   if (!activeAddress) {
-  //     consoleLogger.error('Broke out onClearState: activeAddress not found!')
-  //     return null
-  //   }
+  // ==============
+  // * DELETE APP *
+  // ==============
 
-  //   try {
-  //     // Execute smart contract clearState method
-  //     consoleLogger.info(`Executing Clear State on client with App ID: ${appId.toString()}!`)
-  //     await openBallotMethodManager.clearState(activeAddress, appId)
-  //     consoleLogger.info(`Clear State successful on client with App ID: ${appId.toString()}!`)
-
-  //     setUserMsg({
-  //       msg: `Clear State successful on client with App ID: ${appId.toString()}.`,
-  //       style: 'text-green-700 font-bold',
-  //     })
-
-  //     setOpenClearStateModal(false) // Close Clear State modal
-  //     return true // Successfully cleared state
-  //   } catch (error) {
-  //     consoleLogger.error(`Error executing Clear State on client with App ID: ${appId.toString()}!`, error)
-  //     return null // Return null if an error occurs
-  //   }
-  // }
-
+  // Delete existing App Client by passing the DeleteApp modal App ID
   const handleDeleteApp = async (appId: bigint): Promise<boolean | null> => {
     // Check if the active address exists
     if (!activeAddress) {
       consoleLogger.error('Broke out handleDeleteApp: activeAddress not found!')
       setUserMsg({
-        msg: 'No active address found. Check wallet connection.',
+        msg: 'No active account found. Check wallet connection.',
         style: 'text-red-700 font-bold',
       })
       return null
@@ -268,14 +171,12 @@ const Home: React.FC = () => {
       consoleLogger.info(`Delete App successful on client with App ID: ${appId.toString()}!`)
 
       setUserMsg({
-        msg: `Delete App successful on client with App ID: ${appId.toString()}.`,
+        msg: `Successfully deleted client with App ID: ${appId.toString()}`,
         style: 'text-green-700 font-bold',
       })
 
-      // Clear current App Client data
       setCurrentAppId(null)
       setCurrentAppClient(null)
-
       toggleModal('deleteApp', false) // Close Delete App modal
 
       return true // Successfully cleared state
@@ -294,7 +195,7 @@ const Home: React.FC = () => {
     if (!activeAddress) {
       consoleLogger.error('Broke out queryGlobalState: activeAddress not found!')
       setUserMsg({
-        msg: 'Account address not found! Please check if your wallet is connected.',
+        msg: 'No active account found. Check wallet connection.',
         style: 'text-red-700 font-bold',
       })
       return
@@ -319,24 +220,26 @@ const Home: React.FC = () => {
       const pollChoice1 = appGlobalState['poll_choice1']?.value || ''
       const pollChoice2 = appGlobalState['poll_choice2']?.value || ''
       const pollChoice3 = appGlobalState['poll_choice3']?.value || ''
-      const totalPurgedBoxA_ = BigInt(appGlobalState['total_purged_box_a_']?.value ?? null)
+      // const totalPurgedBoxA_ = BigInt(appGlobalState['total_purged_box_a_']?.value ?? 0)
       const pollStartDateUnix = BigInt(appGlobalState['poll_start_date_unix']?.value ?? 0)
       const pollEndDateUnix = BigInt(appGlobalState['poll_end_date_unix']?.value ?? 0)
-      console.log('totalPurgedBoxA_', totalPurgedBoxA_)
-      // Convert the poll start and end dates into unix integers into string appropriate format
+
+      // Convert the poll start and end dates into string format
       const pollStartDateStr = date.convertUnixToDate(pollStartDateUnix)
       const pollEndDateStr = date.convertUnixToDate(pollEndDateUnix)
 
       // Check voting status (if voting is open or closed)
       const currentVotingPeriod = date.checkVotingPeriod(pollStartDateUnix, pollEndDateUnix)
       setVotingPeriod(currentVotingPeriod) // Set 'votingPeriod'
-      consoleLogger.info('Voting Status:', currentVotingPeriod)
 
+      // Fetch box addresses and check if the active address has voted
       const appBoxes = await algorand.app.getBoxNames(currentAppId)
       const boxAddresses = appBoxes.map((box) => encodeAddress(new Uint8Array(Buffer.from(box.nameBase64, 'base64')).slice(-32)))
-      consoleLogger.info('boxAddressses len:', boxAddresses.length)
+
+      const hasBoxStorage = boxAddresses.includes(activeAddress)
       let hasVoted = null
       let votedFor = null
+
       if (boxAddresses.includes(activeAddress)) {
         try {
           const boxName = new Uint8Array([
@@ -345,25 +248,30 @@ const Home: React.FC = () => {
           ])
           const boxVal = await algorand.app.getBoxValue(currentAppId, boxName)
           if (boxVal) {
-            hasVoted = Number(boxVal[0]) // First byte: hasVoted
-            votedFor = Number(boxVal[1]) // Second byte: votedFor
+            hasVoted = Number(boxVal[0]) // First index: hasVoted
+            votedFor = Number(boxVal[1]) // Second index: votedFor
           }
         } catch (error) {
           consoleLogger.error('Error fetching box value:', error)
-          // Handle the error (e.g., box doesn't exist)
         }
       }
 
-      // Update the button states based on whether the active address has box storage
+      // Set choice display based on votedFor
+      if (votedFor) {
+        const choiceText = [pollChoice1, pollChoice2, pollChoice3][votedFor - 1] || ''
+        setChoiceDisplay({ index: votedFor, text: String(choiceText) })
+      }
+
+      // Update the button states
       updateBtnStates({
-        hasBoxStorage: boxAddresses.includes(activeAddress),
+        hasBoxStorage,
         isCreator: activeAddress === app.creator,
-        voteSubmitted: hasVoted == 1,
+        voteSubmitted: hasVoted === 1,
         ableToPurgeBoxA_: boxAddresses.length !== 1,
         pollVotingPeriodOpen: currentVotingPeriod.open,
       })
 
-      // Use AppClientProps interface to construct an object representing the new state of the current App Client based on its Global State data
+      // Construct new App client state object
       const newAppClient: iInterface.AppClientProps = {
         appId: app.appId,
         appAddress: app.appAddress,
@@ -377,18 +285,12 @@ const Home: React.FC = () => {
         pollStartDateUnix: pollStartDateUnix,
         pollEndDateUnix: pollEndDateUnix,
         boxes: boxAddresses,
-        // hasBoxStorage: boxAddresses.includes(activeAddress),
-        hasVoted: hasVoted,
-        votedFor: votedFor,
+        hasVoted,
+        votedFor,
       }
 
       // Set new App client state object as 'currentAppClient'
       setCurrentAppClient(newAppClient)
-
-      consoleLogger.info(newAppClient.boxes.toString())
-      // consoleLogger.info(newAppClient.hasBoxStorage.toString())
-      consoleLogger.info(newAppClient.hasVoted?.toString() ?? '')
-      consoleLogger.info(newAppClient.votedFor?.toString() ?? '')
 
       consoleLogger.info(`Global State for App client with ID: ${currentAppId.toString()} has been queried successfully!`)
     } catch (error) {
@@ -396,62 +298,12 @@ const Home: React.FC = () => {
     }
   }, [activeAddress, currentAppId, algorand.app, votingPeriod])
 
-  // // Create a method that requests Local State information of an account for a specific client by passing the account address and client App ID through the Algorand client
-  // const queryLocalState = async (appId: bigint, address: string) => {
-  //   if (!activeAddress) {
-  //     consoleLogger.error('Broke out queryLocalState: activeAddress not found!')
-  //     setUserMsg({
-  //       msg: 'Account address not found! Please check if your wallet is connected.',
-  //       style: 'text-red-700 font-bold',
-  //     })
-  //     return
-  //   }
-
-  //   if (!appId) {
-  //     consoleLogger.error('Broke out queryLocalState: App ID not found!')
-  //     setUserMsg({
-  //       msg: `Client with App ID: ${appId?.toString()} not found.`,
-  //       style: 'text-red-700 font-bold',
-  //     })
-  //     return
-  //   }
-
-  //   try {
-  //     // Query account address information from specific client by passing its App ID
-  //     const accountAppInfo = await algorand.client.algod.accountApplicationInformation(address, Number(appId)).do()
-
-  //     // Check access to account Local State
-  //     const accountLocalState = accountAppInfo['app-local-state']
-
-  //     // If there is no data about account Local State tied to queried App Client (then account is NOT opted in to client)
-  //     if (!accountLocalState) {
-  //       consoleLogger.info(`No Local State found for Account with address: ${address}. Check if Account is opted in.`)
-
-  //       // Return Local State keys with following default values
-  //       return { optedIn: false, localVoteStatus: null, localVoteChoice: null }
-  //     }
-
-  //     // If data about account Local State tied to queried App client exists (then account is opted in), proceed with data extraction
-  //     const accountLocalVoteStatus = Number(accountLocalState['key-value']?.[1]?.['value']?.['uint'])
-  //     const accountLocalVoteChoice = Number(accountLocalState['key-value']?.[0]?.['value']?.['uint'])
-
-  //     // Return Local State keys with extracted values
-  //     return { optedIn: true, localVoteStatus: accountLocalVoteStatus, localVoteChoice: accountLocalVoteChoice }
-  //   } catch (error) {
-  //     consoleLogger.error('Error querying local state:', error)
-  //     consoleLogger.error(`Failed to query Local State for Account Address: ${address} tied to App client with ID: ${appId.toString()}!`)
-
-  //     // If error fetching data, return Local State keys with following default values
-  //     return { optedIn: false, localVoteStatus: null, localVoteChoice: null }
-  //   }
-  // }
-
   // Create a new OpenBallot smart contract App client
   const initNewApp = async () => {
     if (!activeAddress) {
       consoleLogger.error('Broke out initNewApp: activeAddress not found!')
       setUserMsg({
-        msg: 'Account address not found! Please check if your wallet is connected.',
+        msg: 'No active account found. Check wallet connection.',
         style: 'text-red-700 font-bold',
       })
       return
@@ -492,27 +344,6 @@ const Home: React.FC = () => {
 
       consoleLogger.info('Set Poll + Fund App MBR atomic txn successful!')
 
-      // // Execute smart contract setPoll method
-      // consoleLogger.info('Executing Set Poll method. Generating App client poll!')
-      // await openBallotMethodManager.setPoll(
-      //   activeAddress,
-      //   appClient.appId,
-      //   currentPollInputs.title,
-      //   currentPollInputs.choices[0],
-      //   currentPollInputs.choices[1],
-      //   currentPollInputs.choices[2],
-      //   BigInt(date.convertDateToUnix(currentPollInputs.startDate)),
-      //   BigInt(date.convertDateToUnix(currentPollInputs.endDate)),
-      // )
-
-      // consoleLogger.info('Set Poll method successfully created App client poll!')
-
-      // // Execute smart contract fundAppMbr method
-      // consoleLogger.info('Executing Fund App MBR method. Creator is funding App account balance!')
-      // await openBallotMethodManager.fundAppMbr(activeAddress, appClient.appId)
-
-      // consoleLogger.info('Fund App MBR method successfully funded App client!')
-
       // Set newly generated appClient.appId as outer-scope currentAppId
       setCurrentAppId(appClient.appId)
     } catch (error) {
@@ -534,7 +365,7 @@ const Home: React.FC = () => {
     // Prompt user if they press the Start button without connecting their wallet first
     if (!activeAddress) {
       setUserMsg({
-        msg: 'Account address not found! Please check if your wallet is connected.',
+        msg: 'No active account found. Check wallet connection.',
         style: 'text-red-700 font-bold',
       })
     } else {
@@ -543,6 +374,7 @@ const Home: React.FC = () => {
       setActiveSection('CREATION') // set UI section to 'CREATION'
     }
   }
+
   // Execute when Create (Poll) button is clicked
   const onCreatePollBtnClick = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -573,7 +405,7 @@ const Home: React.FC = () => {
     if (!activeAddress) {
       consoleLogger.error('Broke out onCancelBtnClick: activeAddress not found!')
       setUserMsg({
-        msg: 'Account address not found! Please check if your wallet is connected.',
+        msg: 'No active account found. Check wallet connection.',
         style: 'text-red-700 font-bold',
       })
       return
@@ -589,7 +421,6 @@ const Home: React.FC = () => {
       })
 
       setChoiceDecision(null) // Reset choice decision to null
-
       setActiveSection('HOME') // set UI section to 'HOME'
 
       // Close any open modals
@@ -606,7 +437,7 @@ const Home: React.FC = () => {
     }
   }
 
-  // Execute when Delete button is clicked
+  // Execute when Purge button is clicked
   const onPurgeBoxBtnClick = async () => {
     if (!currentAppClient?.appId) {
       consoleLogger.error('Broke out onPurgeBoxBtnClick: currentAppClient.appId not found!')
@@ -644,7 +475,7 @@ const Home: React.FC = () => {
 
       // Notify user of success
       setUserMsg({
-        msg: `App with ID: ${currentAppClient?.appId.toString()} successfully purged Box Storage.`,
+        msg: `Purge successful for client App with ID: ${currentAppClient?.appId.toString()}`,
         style: 'text-green-700 font-bold',
       })
     } catch (error) {
@@ -652,7 +483,7 @@ const Home: React.FC = () => {
 
       // Notify user of error
       setUserMsg({
-        msg: `Failed purging Box Storage for App with ID: ${currentAppClient?.appId.toString()}.`,
+        msg: `Failed to Purge Box for client App with ID: ${currentAppClient?.appId.toString()}`,
         style: 'text-red-700 font-bold',
       })
     } finally {
@@ -668,7 +499,7 @@ const Home: React.FC = () => {
     if (!activeAddress) {
       consoleLogger.error('Broke out onRequestBoxBtnClick: activeAddress not found!')
       setUserMsg({
-        msg: 'Account address not found! Please check if your wallet is connected.',
+        msg: 'No active account found. Check wallet connection.',
         style: 'text-red-700 font-bold',
       })
       return
@@ -703,15 +534,6 @@ const Home: React.FC = () => {
         hasBoxStorage: true,
       })
 
-      // Create updatedAppClient variable that takes current App Client and sets its opt in property to true
-      // const updatedAppClient = {
-      //   ...currentAppClient,
-      //   isOptedIn: true,
-      // }
-
-      // // Set updatedApp as new currentAppClient
-      // setCurrentAppClient(updatedAppClient)
-
       // Notify user of success
       setUserMsg({
         msg: `Your account has successfully requested Box storage for client with App ID: ${currentAppClient.appId.toString()}`,
@@ -722,7 +544,7 @@ const Home: React.FC = () => {
 
       // Notify user of error
       setUserMsg({
-        msg: `Error! Failed to request Box storage for client with App with ID: ${currentAppClient?.appId.toString()}.`,
+        msg: `Error! Failed to request Box storage for client with App with ID: ${currentAppClient?.appId.toString()}`,
         style: 'text-red-700 font-bold',
       })
     } finally {
@@ -738,7 +560,7 @@ const Home: React.FC = () => {
     if (!activeAddress) {
       consoleLogger.error('Broke out onDeleteBoxBtnClick: activeAddress not found!')
       setUserMsg({
-        msg: 'Account address not found! Please check if your wallet is connected.',
+        msg: 'No active account found. Check wallet connection.',
         style: 'text-red-700 font-bold',
       })
       return
@@ -773,15 +595,6 @@ const Home: React.FC = () => {
         hasBoxStorage: false,
       })
 
-      // Create updatedAppClient variable that takes current App Client and sets its opt in property to true
-      // const updatedAppClient = {
-      //   ...currentAppClient,
-      //   isOptedIn: true,
-      // }
-
-      // // Set updatedApp as new currentAppClient
-      // setCurrentAppClient(updatedAppClient)
-
       // Notify user of success
       setUserMsg({
         msg: `Your account has successfully deleted Box storage for client with App ID: ${currentAppClient.appId.toString()}`,
@@ -792,7 +605,7 @@ const Home: React.FC = () => {
 
       // Notify user of error
       setUserMsg({
-        msg: `Error! Failed to request Box storage for client with App with ID: ${currentAppClient?.appId.toString()}.`,
+        msg: `Error! Failed to request Box storage for client with App with ID: ${currentAppClient?.appId.toString()}`,
         style: 'text-red-700 font-bold',
       })
     } finally {
@@ -802,172 +615,13 @@ const Home: React.FC = () => {
       })
     }
   }
-  // // Execute when Opt In button is clicked
-  // const onOptInBtnClick = async () => {
-  //   if (!activeAddress) {
-  //     consoleLogger.error('Broke out onOptInBtnClick: activeAddress not found!')
-  //     setUserMsg({
-  //       msg: 'Account address not found! Please check if your wallet is connected.',
-  //       style: 'text-red-700 font-bold',
-  //     })
-  //     return
-  //   }
-
-  //   if (!currentAppClient?.appId) {
-  //     consoleLogger.error('Broke out onOptInBtnClick: currentAppClient not found!')
-  //     setUserMsg({
-  //       msg: 'Client App ID not found!',
-  //       style: 'text-red-700 font-bold',
-  //     })
-  //     return
-  //   }
-
-  //   if (currentAppClient?.isOptedIn) {
-  //     consoleLogger.error('Broke out onOptInBtnClick: activeAddress already opted in!')
-  //     setUserMsg({
-  //       msg: `This account is already opted in to client with App ID: ${currentAppClient.appId.toString()}!`,
-  //       style: 'text-red-700 font-bold',
-  //     })
-  //     return
-  //   }
-
-  //   if (btnStates.actionLoading) {
-  //     return // Exit method if another action is already loading
-  //   }
-
-  //   // Update Buton state 'actionLoading' to true
-  //   updateBtnStates({
-  //     actionLoading: true,
-  //   })
-
-  //   try {
-  //     // Execute smart contract OptIn method
-  //     consoleLogger.info(`Executing Opt In method on client with App ID: ${currentAppClient.appId.toString()}!`)
-  //     // await openBallotMethodManager.optIn(activeAddress, currentAppClient?.appId)
-  //     consoleLogger.info(`Opt In method successfull on client with App ID: ${currentAppClient.appId.toString()}!`)
-
-  //     // Update Buton state 'optedIn' to true
-  //     updateBtnStates({
-  //       optedIn: true,
-  //     })
-
-  //     // Create updatedAppClient variable that takes current App Client and sets its opt in property to true
-  //     const updatedAppClient = {
-  //       ...currentAppClient,
-  //       isOptedIn: true,
-  //     }
-
-  //     // Set updatedApp as new currentAppClient
-  //     setCurrentAppClient(updatedAppClient)
-
-  //     // Notify user of success
-  //     setUserMsg({
-  //       msg: `Your account has successfully opted in to client with App ID: ${currentAppClient.appId.toString()}`,
-  //       style: 'text-green-700 font-bold',
-  //     })
-  //   } catch (error) {
-  //     consoleLogger.error(`Error executing Opt In method on client with App ID: ${currentAppClient.appId.toString()}!`, error)
-
-  //     // Notify user of error
-  //     setUserMsg({
-  //       msg: `Error! Failed to opt in client with App with ID: ${currentAppClient?.appId.toString()}.`,
-  //       style: 'text-red-700 font-bold',
-  //     })
-  //   } finally {
-  //     // Finally, update Buton state 'actionLoading' back to false
-  //     updateBtnStates({
-  //       actionLoading: false,
-  //     })
-  //   }
-  // }
-
-  // // Execute when Opt Out button is clicked
-  // const onOptOutBtnClick = async () => {
-  //   if (!activeAddress) {
-  //     consoleLogger.error('Broke out onOptOutBtnClick: activeAddress not found!')
-  //     setUserMsg({
-  //       msg: 'Account address not found! Please check if your wallet is connected.',
-  //       style: 'text-red-700 font-bold',
-  //     })
-  //     return
-  //   }
-
-  //   if (!currentAppClient?.appId) {
-  //     consoleLogger.error('Broke out onOptOutBtnClick: currentAppclient.appiD not found!!')
-  //     setUserMsg({
-  //       msg: 'Client App ID not found!',
-  //       style: 'text-red-700 font-bold',
-  //     })
-  //     return
-  //   }
-
-  //   if (!currentAppClient?.isOptedIn) {
-  //     consoleLogger.error('Broke out onOptOutBtnClick: activeAddress not opted in!')
-  //     setUserMsg({
-  //       msg: `This account is not opted in to client with App ID: ${currentAppClient.appId.toString()}!`,
-  //       style: 'text-red-700 font-bold',
-  //     })
-  //     return
-  //   }
-
-  //   if (btnStates.actionLoading) {
-  //     return // Exit method if another action is already loading
-  //   }
-
-  //   // Update Buton state 'actionLoading' to true
-  //   updateBtnStates({
-  //     actionLoading: true,
-  //   })
-
-  //   try {
-  //     // Execute smart contract OptOut method
-  //     consoleLogger.info(`Executing Opt Out method on client with App ID: ${currentAppClient.appId.toString()}!`)
-  //     // await openBallotMethodManager.optOut(activeAddress, currentAppClient?.appId)
-  //     consoleLogger.info(`Opt Out method successfull on client with App ID: ${currentAppClient.appId.toString()}!`)
-
-  //     // Update Buton state 'optedIn' to true
-  //     updateBtnStates({
-  //       optedIn: false,
-  //     })
-
-  //     // Create updatedAppClient variable that takes current App Client and sets its opt in property to true
-  //     const updatedAppClient = {
-  //       ...currentAppClient,
-  //       isOptedIn: false,
-  //     }
-
-  //     // Set updatedApp as new currentAppClient
-  //     setCurrentAppClient(updatedAppClient) // Schedule state update
-
-  //     // Notify user of success
-  //     setUserMsg({
-  //       msg: `Your account has successfully opted out of client with App ID: ${currentAppClient.appId.toString()}`,
-  //       style: 'text-green-700 font-bold',
-  //     })
-
-  //     consoleLogger.info(activeAddress, 'has been successfully opted out of App ID:', currentAppClient?.appId)
-  //   } catch (error) {
-  //     consoleLogger.error(`Error executing Opt Out method on client with App ID: ${currentAppClient.appId.toString()}!`, error)
-
-  //     // Notify user of error
-  //     setUserMsg({
-  //       msg: `Error. Failed to opt out of client with App with ID: ${currentAppClient?.appId.toString()}.`,
-  //       style: 'text-red-700 font-bold',
-  //     })
-  //   } finally {
-  //     // Finally, update Buton state 'actionLoading' back to false
-  //     updateBtnStates({
-  //       actionLoading: false,
-  //     })
-  //   }
-  // }
 
   // Execute when Submit Vote button is clicked
   const onSubmitVoteBtnClick = async () => {
     if (!activeAddress) {
       consoleLogger.error('Broke out onSubmitVoteBtnClick: activeAddress not found!')
       setUserMsg({
-        msg: 'Account address not found! Please check if your wallet is connected.',
+        msg: 'No active account found. Check wallet connection.',
         style: 'text-red-700 font-bold',
       })
       return
@@ -1054,6 +708,23 @@ const Home: React.FC = () => {
     }
   }
 
+  // Check and update the voting period
+  const updateVotingPeriod = () => {
+    if (currentAppClient && activeSection === 'ENGAGEMENT') {
+      const currentVotingPeriod = date.checkVotingPeriod(currentAppClient.pollStartDateUnix, currentAppClient.pollEndDateUnix)
+      if (currentVotingPeriod.open === votingPeriod.open) {
+        return // Return early if the voting period status hasn't changed
+      }
+
+      // Update votingPeriod and button state
+      setVotingPeriod(currentVotingPeriod)
+      consoleLogger.info('Voting Status:', currentVotingPeriod)
+      updateBtnStates({
+        pollVotingPeriodOpen: currentVotingPeriod.open,
+      })
+    }
+  }
+
   // =====================
   // * POLL INPUTS LOGIC *
   // =====================
@@ -1125,12 +796,6 @@ const Home: React.FC = () => {
               <button className={button.setBtnStyle('delete')} onClick={() => toggleModal('deleteApp')}>
                 Delete
               </button>
-              {/* <ClearStateModal
-                algorand={algorand}
-                openModal={openClearStateModal}
-                closeModal={toggleClearStateModal}
-                onModalExe={onClearState}
-              /> */}
               <DeleteAppModal
                 algorand={algorand}
                 openModal={modals.deleteApp}
@@ -1246,12 +911,15 @@ const Home: React.FC = () => {
                 }}
               />
               <div className="space-y-2">
-                <p className="text-[20px] -mt-2 font-bold text-gray-800">
-                  Is Voting Open :{' '}
-                  <span className={votingPeriod.open ? 'font-bold text-green-700' : 'text-red-700'}>{votingPeriod.msg}</span>
-                  {/* Refresh button */}
-                  <button onClick={checkVotingStatus}>Refresh Voting Status</button>
-                </p>
+                <div className="flex justify-center gap-2 mb-4">
+                  <p className="text-[20px] font-bold text-gray-800 flex items-center gap-2">
+                    Is Voting Open:{' '}
+                    <span className={votingPeriod.open ? 'font-bold text-green-700' : 'text-red-700'}>{votingPeriod.msg}</span>
+                  </p>
+                  <button onClick={updateVotingPeriod} className="justify-center mt-2">
+                    <img className="w-8 h-8" src="https://cdn-icons-png.flaticon.com/512/10067/10067722.png" alt="Voting Period Refresh" />
+                  </button>
+                </div>
                 {currentAppClient?.hasVoted === 1 && (
                   <p className="text-[20px] font-bold text-green-700">You have already submitted your vote for this poll!</p>
                 )}

@@ -13,16 +13,28 @@ const DeleteAppModal = ({ algorand, openModal, closeModal, onModalExe }: AppModa
 
   // Validate App ID user submitted through the Delete App modal
   const validateUserInputAppId = async () => {
-    const appId = BigInt(userInputAppId) // Cast user input App ID into `BigInt` type
-
     try {
+      const appId = BigInt(userInputAppId) // Cast user input App ID into `BigInt` type
       const app = await algorand.app.getById(appId) // Check if App client with given App ID exists
 
-      if (!app) return // Return if app not found
+      if (!app) {
+        setUserMsg('Client not found. Please ensure App ID is valid.')
+        return
+      }
 
-      // If app found
+      if (!activeAddress) {
+        setUserMsg('No active account found. Check wallet connection.')
+        return
+      }
+
+      if (app.creator !== activeAddress) {
+        setUserMsg('Unable to delete client. Unauthorized account.')
+        return
+      }
+
+      // If app found and address is authorized
       onModalExe(appId) // pass App ID as the modal on-execute arg
-      // setUserMsg(null) // Clear user message field
+      setUserMsg(null) // Clear user message field
     } catch (error) {
       consoleLogger.error('Error getting App ID:', error)
       setUserMsg('Client not found. Please ensure App ID is valid.')
@@ -54,7 +66,7 @@ const DeleteAppModal = ({ algorand, openModal, closeModal, onModalExe }: AppModa
               {userMsg && <p className="text-red-700 font-bold">{userMsg}</p>}
             </div>
           ) : (
-            <p className="text-center text-red-700 font-bold">Wallet not connected!</p>
+            <p className="text-center text-red-700 font-bold">No active account found. Check wallet connection.</p>
           )}
         </div>
         <div className="modal-action">
